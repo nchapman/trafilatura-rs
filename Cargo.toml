@@ -1,0 +1,36 @@
+[package]
+name = "trafilatura"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Extract readable content, comments, and metadata from web pages"
+license = "Apache-2.0"
+
+[lib]
+name = "trafilatura"
+path = "src/lib.rs"
+
+[[bin]]
+name = "trafilatura"
+path = "src/bin/trafilatura.rs"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+ego-tree = "0.10"
+regex = "1"
+scraper = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+url = "2"
+whatlang = "0.16"
+
+[dev-dependencies]
+pretty_assertions = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "extraction"
+harness = false
