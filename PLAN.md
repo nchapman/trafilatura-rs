@@ -344,6 +344,8 @@ The Go `Options` struct has `FallbackCandidates`, `HtmlDateOverride`, and `HtmlD
 
 ### Phase 1: Project Scaffold & DOM Abstraction
 
+> **Status: ✅ COMPLETED** — commits `2efc601` (scaffold) + `2597c00` (DOM abstraction)
+
 **Goal**: Set up the project structure and build the DOM layer that everything else depends on. This is the most important foundation — get it wrong and everything downstream suffers.
 
 **Dependencies**: None (first phase).
@@ -562,18 +564,20 @@ impl Document {
 - `strip_tags` processes in reverse order (prevents parent-before-child issues)
 
 #### Acceptance Criteria
-- [ ] `Document::parse()` can parse any HTML string from test-files/
-- [ ] All text/tail operations match Go etree behavior on the same HTML input
-- [ ] `clone_document()` produces a fully independent copy
-- [ ] `strip_tags`, `strip_elements`, `remove`, `strip` all match Go behavior
-- [ ] `iter_text` matches Go's `etree.IterText` output on 5+ different HTML structures
-- [ ] CSS selector queries produce same matches as Go's `dom.QuerySelectorAll`
-- [ ] At least 30 unit tests covering all DOM operations
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] `Document::parse()` can parse any HTML string from test-files/
+- [x] All text/tail operations match Go etree behavior on the same HTML input
+- [x] `clone_document()` produces a fully independent copy
+- [x] `strip_tags`, `strip_elements`, `remove`, `strip` all match Go behavior
+- [x] `iter_text` matches Go's `etree.IterText` output on 5+ different HTML structures
+- [x] CSS selector queries produce same matches as Go's `dom.QuerySelectorAll`
+- [x] At least 30 unit tests covering all DOM operations
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 2: Settings, Options, URL & Utility Infrastructure
+
+> **Status: ✅ COMPLETED** — commit `1471f20`
 
 **Goal**: Port configuration types, tag catalogs, tag category lists, regex patterns, LRU cache, string utilities, URL utilities, and text filtering utilities.
 
@@ -839,17 +843,19 @@ pub fn check_html_language(doc: &Document, opts: &Options, strict: bool) -> bool
 - Port `url_test.go` (41 lines)
 
 #### Acceptance Criteria
-- [ ] All 25+ regex patterns compile and match test inputs from Go source
-- [ ] LRU cache matches Go behavior (FIFO eviction, count tracking)
-- [ ] URL utilities pass all cases from `url_test.go`
-- [ ] `trim()` behavior matches Go's `trim()` (Fields + Join + TrimSpace)
-- [ ] `text_filter` correctly identifies social media sharing lines
-- [ ] Config defaults produce same values as Go's `DefaultConfig()`
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] All 25+ regex patterns compile and match test inputs from Go source
+- [x] LRU cache matches Go behavior (FIFO eviction, count tracking)
+- [x] URL utilities pass all cases from `url_test.go`
+- [x] `trim()` behavior matches Go's `trim()` (Fields + Join + TrimSpace)
+- [x] `text_filter` correctly identifies social media sharing lines
+- [x] Config defaults produce same values as Go's `DefaultConfig()`
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 3: Selector System
+
+> **Status: ✅ COMPLETED** — commit `a9de1a6`
 
 **Goal**: Port the CSS selector predicate rules that identify content, comments, and metadata regions.
 
@@ -921,17 +927,19 @@ pub fn lower(s: &str) -> String;
 **Tests for Phase 3**: Test each content rule against sample HTML fragments. Verify rule ordering produces expected first-match behavior. Test that discard rules match the expected elements.
 
 #### Acceptance Criteria
-- [ ] All 16 selector files ported (5 content + 4 comment + 7 discard/metadata)
-- [ ] Each rule produces same true/false results as Go on sample HTML elements
-- [ ] `query()` returns first matching element in document order
-- [ ] `query_all()` returns all matching elements in document order
-- [ ] Content rules 1-5 match in priority order (first match wins in extraction loop)
-- [ ] At least 20 unit tests covering representative rules from each category
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] All 16 selector files ported (5 content + 4 comment + 7 discard/metadata)
+- [x] Each rule produces same true/false results as Go on sample HTML elements
+- [x] `query()` returns first matching element in document order
+- [x] `query_all()` returns all matching elements in document order
+- [x] Content rules 1-5 match in priority order (first match wins in extraction loop)
+- [x] At least 20 unit tests covering representative rules from each category
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 4: HTML Processing Pipeline
+
+> **Status: ✅ COMPLETED** — commit `05215a6`
 
 **Goal**: Port document cleaning, tag conversion, link density analysis, and post-processing.
 
@@ -1064,18 +1072,20 @@ Key behaviors:
 - `post_cleaning` removes empty elements and strips attributes
 
 #### Acceptance Criteria
-- [ ] `doc_cleaning` removes all tags in TAGS_TO_CLEAN and strips all tags in TAGS_TO_STRIP
-- [ ] `prune_unwanted_nodes` backup/revert logic works (reverts when >6/7 text removed)
-- [ ] `link_density_test` correctly identifies link-heavy elements
-- [ ] `delete_by_link_density` removes boilerplate blocks without removing content
-- [ ] `convert_tags` correctly strips/preserves links based on IncludeLinks option
-- [ ] `post_cleaning` removes empty elements and strips presentational attributes
-- [ ] All tests from `html-processing_test.go` pass
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] `doc_cleaning` removes all tags in TAGS_TO_CLEAN and strips all tags in TAGS_TO_STRIP
+- [x] `prune_unwanted_nodes` backup/revert logic works (reverts when >6/7 text removed)
+- [x] `link_density_test` correctly identifies link-heavy elements
+- [x] `delete_by_link_density` removes boilerplate blocks without removing content
+- [x] `convert_tags` correctly strips/preserves links based on IncludeLinks option
+- [x] `post_cleaning` removes empty elements and strips presentational attributes
+- [x] All tests from `html-processing_test.go` pass
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 5: Metadata Extraction
+
+> **Status: ✅ COMPLETED** — commit `7008304`
 
 **Goal**: Port metadata extraction from meta tags, JSON-LD, OpenGraph, and HTML attributes.
 
@@ -1170,19 +1180,21 @@ fn extract_date_from_metadata(metadata: &Metadata) -> Option<chrono::NaiveDate>;
 - `metadata-realworld_test.go` (337 lines, 37 real pages with expected metadata values)
 
 #### Acceptance Criteria
-- [ ] `extract_metadata` produces correct title, author, URL, description, sitename for 5+ test HTML files
-- [ ] OpenGraph metadata extracted correctly
-- [ ] JSON-LD parsing handles Article, NewsArticle, BlogPosting, Person, Organization types
-- [ ] Author normalization handles all edge cases (prefixes, social handles, multiple authors)
-- [ ] License extraction finds Creative Commons links
-- [ ] All 13 metadata test functions from `metadata_test.go` pass
-- [ ] All 23 JSON-LD test cases from `metadata-json_test.go` pass
-- [ ] At least 30 of 37 real-world metadata tests pass (some may differ due to date extraction)
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] `extract_metadata` produces correct title, author, URL, description, sitename for 5+ test HTML files
+- [x] OpenGraph metadata extracted correctly
+- [x] JSON-LD parsing handles Article, NewsArticle, BlogPosting, Person, Organization types
+- [x] Author normalization handles all edge cases (prefixes, social handles, multiple authors)
+- [x] License extraction finds Creative Commons links
+- [x] All 13 metadata test functions from `metadata_test.go` pass
+- [x] All 23 JSON-LD test cases from `metadata-json_test.go` pass
+- [x] At least 30 of 37 real-world metadata tests pass (some may differ due to date extraction)
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 6A: Content Extraction — Element Handlers
+
+> **Status: ✅ COMPLETED** — commit `01ea4ce`
 
 **Goal**: Port the element handler functions from `main-extractor.go`. These are the building blocks used by the extraction orchestration.
 
@@ -1246,17 +1258,19 @@ Port these functions:
 - `handle_image`: src vs data-src, missing src, protocol-relative URLs
 
 #### Acceptance Criteria
-- [ ] All 14 handler functions ported and individually testable
-- [ ] `handle_paragraphs` correctly handles nested `<p>` (strips inner, keeps text)
-- [ ] `handle_table` stops at nested tables (doesn't recurse into them)
-- [ ] `handle_image` correctly prioritizes data-src over src when both are image URLs
-- [ ] "done" marking prevents double-processing
-- [ ] At least 15 unit tests covering all handler types
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] All 14 handler functions ported and individually testable
+- [x] `handle_paragraphs` correctly handles nested `<p>` (strips inner, keeps text)
+- [x] `handle_table` stops at nested tables (doesn't recurse into them)
+- [x] `handle_image` correctly prioritizes data-src over src when both are image URLs
+- [x] "done" marking prevents double-processing
+- [x] At least 15 unit tests covering all handler types
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 6B: Content Extraction — Orchestration
+
+> **Status: ✅ COMPLETED** — commit `01ea4ce`
 
 **Goal**: Port the top-level extraction functions that orchestrate the element handlers.
 
@@ -1343,17 +1357,34 @@ fn prune_unwanted_sections(
 - Precision vs recall mode behavior
 
 #### Acceptance Criteria
-- [ ] `extract_content` finds content for all mock HTML files that Go finds content for
-- [ ] `extract_comments` extracts comments when present
-- [ ] `recover_wild_text` recovers text from documents with no standard content structure
-- [ ] `prune_unwanted_sections` correctly applies discard rules and link density filtering
-- [ ] At least 50 test cases from `trafilatura_test.go` pass
-- [ ] Precision/recall mode options change extraction behavior as expected
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] `extract_content` finds content for all mock HTML files that Go finds content for
+- [x] `extract_comments` extracts comments when present
+- [x] `recover_wild_text` recovers text from documents with no standard content structure
+- [x] `prune_unwanted_sections` correctly applies discard rules and link density filtering
+- [x] At least 50 test cases from `trafilatura_test.go` pass
+- [x] Precision/recall mode options change extraction behavior as expected
+- [x] `cargo test` passes, `cargo clippy` clean
+
+#### Implementation Notes (Phase 6)
+
+Key design decisions made during implementation:
+
+- **Element handlers return `Option<String>`** (HTML fragment strings), not `Option<NodeId>`. This avoids ego-tree's restriction on using NodeIds across different `Document` instances (ego-tree arenas can't share node handles). Returning HTML string fragments sidesteps all cross-document ownership issues.
+- **NodeId preservation across `clone_document()`**: `clone_document()` does `self.tree.clone()` which copies the arena `Vec` with all indices intact. A `NodeId` obtained from the original doc is valid in the cloned doc at the same index. This is relied upon in `prune_unwanted_sections`.
+- **`prune_unwanted_sections` signature**: Takes `&Document`, clones internally (via `prune_unwanted_nodes` chain), returns new `Document`. The caller's original `doc` is never mutated.
+- **`handle_code_blocks` structure preservation**: The handler takes `&mut Document`, strips all attributes from descendants (Go's etree strips attrs), then calls `inner_html` to get the cleaned inner HTML, then marks descendants as "done". Preserves nested structure instead of flattening to text.
+- **`handle_titles` child restoration**: Before calling `handle_text_node` on a child, snapshot `text()` and `tail()`. If `handle_text_node` returns `None`, restore from snapshots and mark the child "done" anyway — Go always appends something here.
+- **HTML attribute escaping**: `escape_attr()` helper escapes `&`, `"`, `<`, `>` in any string interpolated into a raw HTML attribute. Used in `handle_image` for `src` and `alt` attributes.
+- **Paragraph density heuristic**: Must count `<p>` elements from the ORIGINAL unmodified document (not the pruned work copy). Go's `extractContent` counts from `doc` before any pruning.
+- **`recover_wild_text` tag lists**: Uses `XML_LB_TAGS` and `XML_LIST_TAGS` from `settings.rs` (not hardcoded slices), matching Go's `xmlLinebreakTags` / `xmlListTags`.
+- **Content selector iteration**: `selector::content::CONTENT` is `&[Rule]`. To try each rule independently: `std::slice::from_ref(&rule)` converts a single Rule reference to a `&[Rule]`.
+- **Result assembly**: Collect `Vec<(String, String)>` (html_fragment, tag_name), pop trailing head/ref tags, join and parse into result Document, strip "done" elements and "div" wrappers.
 
 ---
 
 ### Phase 7: Baseline & External Fallback
+
+> **Status: 🔲 NEXT**
 
 **Goal**: Port the fallback extraction strategies for when the main algorithm doesn't find enough content.
 
