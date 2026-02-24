@@ -106,6 +106,117 @@ pub fn uniquify_lists(inputs: &[&str]) -> Vec<String> {
     result
 }
 
+/// Decodes common HTML entities in a string.
+///
+/// Handles named entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&nbsp;`, etc.)
+/// and numeric references (`&#NNN;`, `&#xHHH;`).
+pub fn unescape_html(s: &str) -> String {
+    if !s.contains('&') {
+        return s.to_string();
+    }
+
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.char_indices().peekable();
+
+    while let Some((_, ch)) = chars.next() {
+        if ch != '&' {
+            result.push(ch);
+            continue;
+        }
+
+        // Collect entity name up to ';' or a non-entity character.
+        // Use peek() so that the terminating character is NOT consumed when
+        // the guard fires — the outer loop will process it on the next iteration.
+        let mut entity = String::new();
+        let mut found_semi = false;
+
+        while let Some(&(_, ec)) = chars.peek() {
+            if ec == ';' {
+                chars.next();
+                found_semi = true;
+                break;
+            }
+            if entity.len() > 12 || (!ec.is_alphanumeric() && ec != '#') {
+                // Leave ec unconsumed so the outer loop handles it normally.
+                break;
+            }
+            chars.next();
+            entity.push(ec);
+        }
+
+        if !found_semi {
+            result.push('&');
+            result.push_str(&entity);
+            continue;
+        }
+
+        let decoded: Option<&str> = match entity.as_str() {
+            "amp" => Some("&"),
+            "lt" => Some("<"),
+            "gt" => Some(">"),
+            "quot" => Some("\""),
+            "apos" => Some("'"),
+            "nbsp" => Some("\u{00A0}"),
+            "ndash" => Some("\u{2013}"),
+            "mdash" => Some("\u{2014}"),
+            "hellip" => Some("\u{2026}"),
+            "laquo" => Some("\u{00AB}"),
+            "raquo" => Some("\u{00BB}"),
+            "copy" => Some("\u{00A9}"),
+            "reg" => Some("\u{00AE}"),
+            "trade" => Some("\u{2122}"),
+            _ => None,
+        };
+
+        if let Some(d) = decoded {
+            result.push_str(d);
+            continue;
+        }
+
+        // Numeric character references.
+        if let Some(stripped) = entity.strip_prefix('#') {
+            let cp = if let Some(hex) = stripped.strip_prefix('x').or_else(|| stripped.strip_prefix('X')) {
+                u32::from_str_radix(hex, 16).ok()
+            } else {
+                stripped.parse::<u32>().ok()
+            };
+            if let Some(c) = cp.and_then(char::from_u32) {
+                result.push(c);
+                continue;
+            }
+        }
+
+        // Unknown entity — emit literally.
+        result.push('&');
+        result.push_str(&entity);
+        result.push(';');
+    }
+
+    result
+}
+
+/// Removes characters in common emoji Unicode ranges.
+///
+/// Approximates `gomoji.RemoveEmojis` from go-trafilatura.
+/// Covers: Misc Symbols/Dingbats (U+2600–U+27BF), Supplemental Arrows &
+/// Dingbats (U+2900–U+2BFF), supplementary emoji planes (U+1F000–U+1FFFF),
+/// variation selectors (U+FE00–U+FE0F), and the Tags block (U+E0000–U+E007F).
+pub fn remove_emojis(s: &str) -> String {
+    s.chars()
+        .filter(|&c| {
+            let cp = c as u32;
+            !matches!(
+                cp,
+                0x2600..=0x27BF    // Misc Symbols, Dingbats
+                | 0x2900..=0x2BFF  // Supplemental Arrows, Misc Symbols & Arrows
+                | 0x1F000..=0x1FFFF // Supplementary multilingual plane (emoji)
+                | 0xFE00..=0xFE0F  // Variation selectors
+                | 0xE0000..=0xE007F // Tags block
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,5 +279,56 @@ mod tests {
         let result = uniquify_lists(&[r#""rust", "python""#]);
         assert!(result.contains(&"rust".to_string()));
         assert!(result.contains(&"python".to_string()));
+    }
+
+    #[test]
+    fn test_unescape_html_common_entities() {
+        assert_eq!(unescape_html("&amp;"), "&");
+        assert_eq!(unescape_html("&lt;tag&gt;"), "<tag>");
+        assert_eq!(unescape_html("&quot;hello&quot;"), "\"hello\"");
+        assert_eq!(unescape_html("A &amp; B"), "A & B");
+        assert_eq!(unescape_html("no entities"), "no entities");
+    }
+
+    #[test]
+    fn test_unescape_html_numeric_refs() {
+        assert_eq!(unescape_html("&#65;"), "A");
+        assert_eq!(unescape_html("&#x41;"), "A");
+        assert_eq!(unescape_html("&#x1F600;"), "\u{1F600}");
+    }
+
+    #[test]
+    fn test_unescape_html_long_entity_no_corruption() {
+        // Entity names longer than 12 chars should be emitted literally without
+        // swallowing the terminating character.
+        let input = "&verylongentityname; rest";
+        let result = unescape_html(input);
+        // The long unknown entity is emitted literally; " rest" must follow intact.
+        assert!(result.ends_with(" rest"), "got: {result}");
+        assert!(result.contains('&'), "got: {result}");
+    }
+
+    #[test]
+    fn test_unescape_html_non_entity_ampersand() {
+        // Ampersand not followed by a semicolon should be emitted literally.
+        assert_eq!(unescape_html("a & b"), "a & b");
+    }
+
+    #[test]
+    fn test_remove_emojis_basic() {
+        // U+1F600 (😀) — supplementary plane, should be removed.
+        assert_eq!(remove_emojis("hello \u{1F600} world"), "hello  world");
+        // U+2764 (❤) — in Misc Symbols range, removed.
+        assert_eq!(remove_emojis("love \u{2764}"), "love ");
+        // ASCII should not be affected.
+        assert_eq!(remove_emojis("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_remove_emojis_extended_ranges() {
+        // U+2B50 (⭐) — in 0x2900–0x2BFF range, should now be removed.
+        assert_eq!(remove_emojis("rating \u{2B50}"), "rating ");
+        // U+2B06 (⬆) — also in that range.
+        assert_eq!(remove_emojis("up \u{2B06}"), "up ");
     }
 }
