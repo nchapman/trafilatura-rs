@@ -51,18 +51,21 @@ pub fn prune_unwanted_sections(
         }
     }
 
-    let root = work.root();
+    // Use the body element (an actual Element node) as the subtree root for iter()-based
+    // operations. work.root() returns the virtual Document node which is not an Element,
+    // causing iter() to return empty (collect_iter returns early for non-Element nodes).
+    let subtree = work.body().unwrap_or_else(|| work.root());
 
     // Remove elements by link density (two passes).
     for _ in 0..2 {
-        delete_by_link_density(&mut work, root, opts, true, &["div"]);
-        delete_by_link_density(&mut work, root, opts, false, &["ul", "ol", "dl"]);
-        delete_by_link_density(&mut work, root, opts, false, &["p"]);
+        delete_by_link_density(&mut work, subtree, opts, true, &["div"]);
+        delete_by_link_density(&mut work, subtree, opts, false, &["ul", "ol", "dl"]);
+        delete_by_link_density(&mut work, subtree, opts, false, &["p"]);
     }
 
     // Remove tables by link density.
     if potential_tags.contains("table") || opts.focus == ExtractionFocus::FavorPrecision {
-        let tables = work.iter(root, &["table"]);
+        let tables = work.iter(subtree, &["table"]);
         for &table_id in tables.iter().rev() {
             if link_density_test_tables(&work, table_id, opts) {
                 work.remove(table_id, false);
@@ -72,8 +75,8 @@ pub fn prune_unwanted_sections(
 
     // Precision-specific cleanup.
     if opts.focus == ExtractionFocus::FavorPrecision {
-        // Delete trailing title elements from the root's direct children.
-        let children = work.children(root);
+        // Delete trailing title elements from the subtree's direct children.
+        let children = work.children(subtree);
         for &child_id in children.iter().rev() {
             if XML_HEAD_TAGS.contains(work.tag_name(child_id)) {
                 work.remove(child_id, false);
@@ -82,8 +85,8 @@ pub fn prune_unwanted_sections(
             }
         }
 
-        delete_by_link_density(&mut work, root, opts, false, &["h1", "h2", "h3", "h4", "h5", "h6", "summary"]);
-        delete_by_link_density(&mut work, root, opts, false, &["blockquote", "pre", "q"]);
+        delete_by_link_density(&mut work, subtree, opts, false, &["h1", "h2", "h3", "h4", "h5", "h6", "summary"]);
+        delete_by_link_density(&mut work, subtree, opts, false, &["blockquote", "pre", "q"]);
     }
 
     work
@@ -183,11 +186,21 @@ pub fn extract_content(
             None => continue,
         };
 
-        // Clone and prune.  NodeIds are preserved across clone_document().
-        let mut work = prune_unwanted_sections(doc, &potential_tags, opts);
+        // Extract just the matched subtree's inner content into a standalone document.
+        // This mirrors Go's behavior: `pruneUnwantedSections(subTree, ...)` clones and
+        // prunes only the subtree, not the full document.  Pruning the full document
+        // incorrectly applies link-density tests across unrelated page sections, which
+        // can remove the very element we just selected.
+        let subtree_inner = doc.inner_html(sub_id);
+        let subtree_html = format!("<html><body>{subtree_inner}</body></html>");
+        let subtree_doc = Document::parse(&subtree_html);
+
+        // Prune unwanted content within the subtree.
+        let mut work = prune_unwanted_sections(&subtree_doc, &potential_tags, opts);
+        let work_body = work.body().unwrap_or_else(|| work.root());
 
         // Skip if the subtree is now empty.
-        if work.children(sub_id).is_empty() {
+        if work.children(work_body).is_empty() {
             continue;
         }
 
@@ -206,16 +219,16 @@ pub fn extract_content(
             potential_tags.insert("div");
         }
 
-        // Strip irrelevant inline tags from the work doc.
+        // Strip irrelevant inline tags from the subtree.
         if !potential_tags.contains("a") {
-            work.strip_tags(sub_id, &["a"]);
+            work.strip_tags(work_body, &["a"]);
         }
         if !potential_tags.contains("span") {
-            work.strip_tags(sub_id, &["span"]);
+            work.strip_tags(work_body, &["span"]);
         }
 
         // Collect all descendant elements of the subtree.
-        let mut sub_elements = work.get_elements_by_tag_name(sub_id, "*");
+        let mut sub_elements = work.get_elements_by_tag_name(work_body, "*");
 
         // If the only sub-elements are <br>, process the subtree root directly.
         let tag_set: HashSet<&str> = sub_elements
@@ -223,7 +236,7 @@ pub fn extract_content(
             .map(|&id| work.tag_name(id))
             .collect();
         if tag_set.len() == 1 && tag_set.contains("br") {
-            sub_elements = vec![sub_id];
+            sub_elements = vec![work_body];
         }
 
         // Process each element.

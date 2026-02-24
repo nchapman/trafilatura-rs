@@ -1384,7 +1384,7 @@ Key design decisions made during implementation:
 
 ### Phase 7: Baseline & External Fallback
 
-> **Status: 🔲 NEXT**
+> **Status: ✅ COMPLETED** — commit `de746c5`
 
 **Goal**: Port the fallback extraction strategies for when the main algorithm doesn't find enough content.
 
@@ -1463,16 +1463,18 @@ Post-fallback: `sanitize_tree()` cleans the readability output:
 - `sanitize_tree` removes unsafe elements from readability output
 
 #### Acceptance Criteria
-- [ ] `baseline` extracts text from JSON-LD articleBody when present
-- [ ] `baseline` falls through tiers correctly (JSON-LD → article → p → body)
-- [ ] `candidate_is_usable` matches Go's heuristic decisions on test cases
-- [ ] `sanitize_tree` removes all tags from `tagsToSanitize`
-- [ ] All tests from `baseline_test.go` pass
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] `baseline` extracts text from JSON-LD articleBody when present
+- [x] `baseline` falls through tiers correctly (JSON-LD → article → p → body)
+- [x] `candidate_is_usable` matches Go's heuristic decisions on test cases
+- [x] `sanitize_tree` removes all tags from `tagsToSanitize`
+- [x] All tests from `baseline_test.go` pass
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 8: Core API & Integration
+
+> **Status: ✅ COMPLETED** — commit cb0290a
 
 **Goal**: Wire everything together into the public API. Implement `ExtractDocument` pipeline.
 
@@ -1603,18 +1605,20 @@ pub fn create_readable_document(result: &ExtractResult) -> Document;
 - Port representative tests from `trafilatura_test.go` that test the full pipeline
 
 #### Acceptance Criteria
-- [ ] `extract()` produces correct output for at least 10 mock HTML files
-- [ ] All error types returned appropriately (LanguageMismatch, InsufficientContent, etc.)
-- [ ] Pipeline follows same order as Go: metadata → clone → clean → comments → content → fallback → baseline → checks
-- [ ] ExcludeComments option works
-- [ ] ExcludeTables option works
-- [ ] IncludeImages and IncludeLinks options work
-- [ ] Deduplicate option works
-- [ ] `cargo test` passes, `cargo clippy` clean
+- [x] `extract()` produces correct output for at least 10 mock HTML files
+- [x] All error types returned appropriately (LanguageMismatch, InsufficientContent, etc.)
+- [x] Pipeline follows same order as Go: metadata → clone → clean → comments → content → fallback → baseline → checks
+- [x] ExcludeComments option works
+- [x] ExcludeTables option works
+- [x] IncludeImages and IncludeLinks options work
+- [x] Deduplicate option works
+- [x] `cargo test` passes, `cargo clippy` clean
 
 ---
 
 ### Phase 9: Real-World Tests & Comparison Suite
+
+> **Status: 🔲 NEXT**
 
 **Goal**: Comprehensive test coverage proving we match Go's extraction quality.
 

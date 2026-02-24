@@ -63,7 +63,7 @@ pub fn handle_titles(
                 doc.set_text(child_id, &saved_text);
                 doc.set_tail(child_id, &saved_tail);
             }
-            doc.set_tag_name(child_id, "done");
+            // Note: children are marked "done" AFTER inner_html is captured below.
         }
         true
     };
@@ -77,7 +77,11 @@ pub fn handle_titles(
         return None;
     }
 
+    // Capture inner HTML BEFORE marking children as "done" (mirrors Go clone-before-mark).
     let inner = doc.inner_html(id);
+    for &child_id in &children {
+        doc.set_tag_name(child_id, "done");
+    }
     Some(format!("<{result_tag}>{inner}</{result_tag}>"))
 }
 
@@ -324,22 +328,34 @@ pub fn handle_quotes(
 
     let tag = doc.tag_name(id).to_string();
 
-    // Process each descendant.
+    // Process each descendant (text trimming / filter).
     let descendants = doc.get_elements_by_tag_name(id, "*");
     for &child_id in &descendants {
         if doc.tag_name(child_id) != "done" {
             let _ = process_node(doc, child_id, Some(cache), opts);
-            doc.set_tag_name(child_id, "done");
         }
     }
 
     let full_text = trim(&doc.iter_text(id, ""));
     if !text_chars_test(&full_text) {
+        // Mark as done even on discard so the outer loop skips these children.
+        for &child_id in &descendants {
+            if doc.tag_name(child_id) != "done" {
+                doc.set_tag_name(child_id, "done");
+            }
+        }
         return None;
     }
 
-    // Go strips listXmlQuoteTags from the result. We take the full inner HTML.
+    // Capture inner HTML BEFORE marking children as "done" — mirrors Go's clone-before-mark
+    // pattern. Go builds a fresh element from processed children so the returned node never
+    // contains "done" markers. We reproduce that by serialising first, then marking.
     let inner = doc.inner_html(id);
+    for &child_id in &descendants {
+        if doc.tag_name(child_id) != "done" {
+            doc.set_tag_name(child_id, "done");
+        }
+    }
     Some(format!("<{tag}>{inner}</{tag}>"))
 }
 
@@ -595,7 +611,7 @@ pub fn handle_paragraphs(
     // Remove empty non-void children (backward).
     let remaining = doc.get_elements_by_tag_name(id, "*");
     for &child_id in remaining.iter().rev() {
-        if doc.tag_name(child_id) == "done" || doc.is_void_element(child_id) {
+        if doc.is_void_element(child_id) {
             continue;
         }
         if !text_chars_test(&doc.text(child_id)) {
@@ -604,13 +620,18 @@ pub fn handle_paragraphs(
     }
 
     // Clean trailing line breaks.
+    // Go condition: `br.NextSibling == nil || etree.Tail(br) == ""`
+    // In Go's node model, NextSibling is a text node when there is tail text, so
+    // NextSibling == nil implies tail == "".  The combined condition simplifies to
+    // just checking whether the tail is empty — remove the <br> only when it has
+    // no text content after it (tail is empty).
     let line_breaks: Vec<NodeId> = doc
         .get_elements_by_tag_name(id, "*")
         .into_iter()
         .filter(|&cid| matches!(doc.tag_name(cid), "br" | "hr"))
         .collect();
     for &br_id in line_breaks.iter().rev() {
-        if doc.next_element_sibling(br_id).is_none() || doc.tail(br_id).is_empty() {
+        if doc.tail(br_id).is_empty() {
             doc.remove(br_id, false);
         }
     }
@@ -624,14 +645,18 @@ pub fn handle_paragraphs(
         .collect();
 
     if !result_text.is_empty() || !result_children.is_empty() {
+        // Capture HTML before marking children as "done" — mirrors Go's clone-before-mark
+        // pattern in handleParagraphs. In Go, `dom.Clone(element, true)` captures the state
+        // (including <br> tail text) before marking originals as "done". We reproduce that by
+        // serialising the inner HTML first, then marking the in-doc nodes as done.
+        let inner = doc.inner_html(id);
+        tracing::debug!("keeping p-child: {inner}");
         // Mark all element children as done to prevent re-processing.
         for &child_id in &all_elem_children {
             if doc.tag_name(child_id) != "done" {
                 doc.set_tag_name(child_id, "done");
             }
         }
-        let inner = doc.inner_html(id);
-        tracing::debug!("keeping p-child: {inner}");
         return Some(format!("<p>{inner}</p>"));
     }
 

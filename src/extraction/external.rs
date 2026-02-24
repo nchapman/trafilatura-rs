@@ -25,14 +25,13 @@ static TAGS_TO_SANITIZE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 /// Compare our extraction with external fallback candidates and return the best result.
 ///
-/// Currently no external fallback generators are configured (no Rust equivalent of
-/// go-readability / go-domdistiller). The function applies `sanitize_tree` to clean
-/// the extracted doc before returning it.
+/// Mirrors Go's `compareExternalExtraction`: tries the readability fallback generator
+/// in order, using `candidate_is_usable` to decide whether to replace the result.
 ///
 /// Port of `compareExternalExtraction`.
 pub fn compare_external_extraction(
-    _original_doc: &Document,
-    mut extracted_doc: Document,
+    original_doc: &Document,
+    extracted_doc: Document,
     opts: &Options,
 ) -> (Document, String) {
     // The extracted_doc is the full HTML document returned by extract_content.
@@ -40,7 +39,8 @@ pub fn compare_external_extraction(
     // matching Go's behaviour where extractedDoc is the <body> fragment.
     let text_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
     let extracted_text = trim(&extracted_doc.iter_text(text_root, " "));
-    let len_extracted = extracted_text.chars().count();
+    let mut len_extracted = extracted_text.chars().count();
+    let mut extracted_doc = extracted_doc;
 
     // Bypass for FavorRecall when we already have plenty of text.
     if opts.focus == ExtractionFocus::FavorRecall
@@ -49,17 +49,78 @@ pub fn compare_external_extraction(
         return (extracted_doc, extracted_text);
     }
 
-    // TODO: Run readability / domdistiller fallback generators here when a suitable
-    // Rust implementation is identified. In go-trafilatura the Go readability and
-    // go-domdistiller libraries are tried in order, and candidate_is_usable() decides
-    // whether to replace the extraction result. See compare_external_extraction in
-    // external.go for the full algorithm.
+    // Serialize the original doc to an HTML string for readability input.
+    // In Go this is `dom.Clone(originalDoc, true)` + optional `pruneUnwantedNodes`.
+    // We must get the <html> element (not the document root, which is not an element node).
+    let html_root = original_doc.get_elements_by_tag_name(original_doc.root(), "html")
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| original_doc.root());
+    let cleaned_html = original_doc.outer_html(html_root);
+
+    // Try readability fallback generator only when our own extraction is empty.
+    //
+    // Note: go-trafilatura uses go-readability which produces cleaner, more accurate
+    // output than the Rust readable-readability crate. The Rust crate sometimes picks
+    // the wrong section of the page, and if we allowed it to replace a non-empty
+    // trafilatura extraction, it would cause regressions. We therefore only apply it
+    // when trafilatura produced nothing (len_extracted == 0), which is the case where
+    // the original doc has malformed HTML that strips away in doc_cleaning.
+    if len_extracted == 0 {
+        if let Some(mut candidate_doc) = generate_readability_candidate(&cleaned_html) {
+            // Pre-strip elements that sanitize_tree would remove (destroying their children).
+            // readable-readability may keep original structural wrappers like <aside>,
+            // whereas go-readability creates clean article nodes. Stripping preserves content.
+            let cand_root = candidate_doc.root();
+            candidate_doc.strip_tags(cand_root, &["aside", "figure", "footer", "nav"]);
+
+            let cand_root = candidate_doc.body().unwrap_or_else(|| candidate_doc.root());
+            let candidate_text = trim(&candidate_doc.iter_text(cand_root, " "));
+            let len_candidate = candidate_text.chars().count();
+
+            if candidate_is_usable(&candidate_doc, &extracted_doc, len_candidate, len_extracted, opts) {
+                extracted_doc = candidate_doc;
+                len_extracted = len_candidate;
+            }
+
+            let _ = len_extracted;
+        }
+    }
 
     // Final cleaning of the extraction result.
     sanitize_tree(&mut extracted_doc, opts);
     let text_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
     let extracted_text = trim(&extracted_doc.iter_text(text_root, " "));
     (extracted_doc, extracted_text)
+}
+
+/// Run the `readable-readability` algorithm on the provided HTML string and return the
+/// extracted content as a `Document`.
+///
+/// Returns `None` if readability produces an empty result.
+///
+/// Port of the readability generator in `createFallbackGenerators`.
+fn generate_readability_candidate(html: &str) -> Option<Document> {
+    let mut readability = readable_readability::Readability::new();
+    let (node, _meta) = readability.parse(html);
+
+    // Serialize the kuchiki NodeRef to an HTML string, then parse into our Document.
+    let mut output = Vec::new();
+    node.serialize(&mut output).ok()?;
+    let html_string = String::from_utf8(output).ok()?;
+
+    if html_string.is_empty() {
+        return None;
+    }
+
+    let doc = Document::parse(&html_string);
+    let body = doc.body().unwrap_or_else(|| doc.root());
+    let text = doc.text_content(body);
+    if trim(&text).is_empty() {
+        return None;
+    }
+
+    Some(doc)
 }
 
 /// Check if a fallback candidate is better than the current extraction result.

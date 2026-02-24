@@ -409,6 +409,32 @@ pub fn process_node(
     Some(id)
 }
 
+/// Prunes unwanted nodes from a subtree IN-PLACE (no cloning).
+///
+/// Unlike `prune_unwanted_nodes`, this function does not clone the document —
+/// it modifies `doc` directly. It also has no backup mechanism. Used by
+/// `extract_content` so that "done" marks on processed elements persist across
+/// selector-rule iterations, matching Go's in-place behavior.
+pub fn prune_unwanted_nodes_inplace(doc: &mut Document, subtree_id: NodeId, rules: &[Rule]) {
+    let matches = query_all(doc, subtree_id, rules);
+    for &id in matches.iter().rev() {
+        let tail = doc.tail(id);
+        if !tail.is_empty() {
+            let target = doc.prev_element_sibling(id).or_else(|| doc.parent(id));
+            if let Some(target_id) = target {
+                let prev_tail = doc.tail(target_id);
+                let new_tail = if prev_tail.is_empty() {
+                    tail
+                } else {
+                    format!("{prev_tail} {tail}")
+                };
+                doc.set_tail(target_id, &new_tail);
+            }
+        }
+        doc.remove(id, false);
+    }
+}
+
 /// Cleans the extracted content document.
 /// Removes empty nodes and strips disallowed attributes.
 ///

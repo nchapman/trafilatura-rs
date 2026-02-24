@@ -555,13 +555,13 @@ impl Document {
 
     fn collect_iter(&self, id: NodeId, tags: &[&str], include_self: bool, out: &mut Vec<NodeId>) {
         let Some(node) = self.tree.get(id) else { return };
-        let tag = match node.value() {
-            Node::Element(e) => e.name.local.as_ref(),
-            _ => return,
-        };
 
-        if include_self && (tags.is_empty() || tags.contains(&tag)) {
-            out.push(id);
+        // Only include Element nodes in results; always recurse into children.
+        if let Node::Element(e) = node.value() {
+            let tag = e.name.local.as_ref();
+            if include_self && (tags.is_empty() || tags.contains(&tag)) {
+                out.push(id);
+            }
         }
 
         for child_id in node.children().map(|c| c.id()).collect::<Vec<_>>() {

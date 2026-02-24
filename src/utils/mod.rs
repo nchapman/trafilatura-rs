@@ -8,14 +8,27 @@ pub mod url;
 
 use std::path::Path;
 
+use unicode_normalization::UnicodeNormalization;
+
 use crate::dom::{Document, NodeId};
 
 /// Collapses internal whitespace and trims leading/trailing spaces.
 /// Equivalent to Go's `strings.Join(strings.Fields(s), " ")`.
 ///
+/// Also strips U+00AD (SOFT HYPHEN) characters, matching Go's html.Parse behavior
+/// which removes them from text nodes during parsing.
+///
+/// Applies Unicode NFC normalization, matching Go's html.Parse which normalizes
+/// NFD-encoded text (e.g. `u + U+0308` → `ü`) to NFC.
+///
 /// Port of `trim`.
 pub fn trim(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
+    // Strip soft hyphens (U+00AD) — Go's HTML parser removes them during tokenization.
+    let no_soft_hyphen: String = s.chars().filter(|&c| c != '\u{00AD}').collect();
+    // Collapse whitespace (split_whitespace handles all Unicode whitespace).
+    let joined = no_soft_hyphen.split_whitespace().collect::<Vec<_>>().join(" ");
+    // NFC normalization — Go's html.Parse normalizes NFD decomposed chars to NFC.
+    joined.nfc().collect()
 }
 
 /// Counts words (whitespace-delimited tokens) in a string.
