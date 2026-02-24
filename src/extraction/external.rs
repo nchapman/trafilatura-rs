@@ -95,9 +95,8 @@ pub fn candidate_is_usable(
             .map(|&pid| trim(&extracted_doc.iter_text(pid, " ")).chars().count())
             .sum();
 
-        (p_text_len == 0 && len_candidate > opts.config.min_extracted_size * 2)
-            || (extracted_tables.len() > extracted_paragraphs.len()
-                && len_candidate > opts.config.min_extracted_size * 2)
+        let candidate_big = len_candidate > opts.config.min_extracted_size * 2;
+        (candidate_big && (p_text_len == 0 || extracted_tables.len() > extracted_paragraphs.len()))
             || (opts.focus == ExtractionFocus::FavorRecall
                 && extracted_heads.is_empty()
                 && !candidate_headings.is_empty()
