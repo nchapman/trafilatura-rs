@@ -39,7 +39,7 @@ pub fn compare_external_extraction(
     // matching Go's behaviour where extractedDoc is the <body> fragment.
     let text_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
     let extracted_text = trim(&extracted_doc.iter_text(text_root, " "));
-    let mut len_extracted = extracted_text.chars().count();
+    let len_extracted = extracted_text.chars().count();
     let mut extracted_doc = extracted_doc;
 
     // Bypass for FavorRecall when we already have plenty of text.
@@ -80,10 +80,7 @@ pub fn compare_external_extraction(
 
             if candidate_is_usable(&candidate_doc, &extracted_doc, len_candidate, len_extracted, opts) {
                 extracted_doc = candidate_doc;
-                len_extracted = len_candidate;
             }
-
-            let _ = len_extracted;
         }
     }
 

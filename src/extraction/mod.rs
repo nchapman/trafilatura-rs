@@ -260,7 +260,7 @@ pub fn extract_content(
         }
 
         // If we have more than one result element, stop trying selectors.
-        if result_elems.len() - batch_start > 1 {
+        if result_elems.len().saturating_sub(batch_start) > 1 {
             break 'selector_loop;
         }
     }
@@ -333,14 +333,23 @@ pub fn extract_comments(
     let mut result_elems: Vec<String> = Vec::new();
 
     'comment_loop: for &rule in selector::comments::COMMENTS {
-        let sub_id = match selector::query(doc, doc.root(), std::slice::from_ref(&rule)) {
+        // Find the comment section root in the original document (for later removal).
+        let sub_id_in_doc =
+            match selector::query(doc, doc.root(), std::slice::from_ref(&rule)) {
+                Some(id) => id,
+                None => continue,
+            };
+
+        // Clone and prune a working copy, then re-query it to get the subtree root.
+        // We re-query rather than reusing the NodeId from `doc` because `prune_unwanted_nodes`
+        // removes matched nodes from the clone, and a NodeId from `doc` may point to a
+        // detached or absent node in `work` if the comment root was pruned.
+        let mut work =
+            prune_unwanted_nodes(doc, selector::discard::DISCARDED_COMMENTS, false);
+        let sub_id = match selector::query(&work, work.root(), std::slice::from_ref(&rule)) {
             Some(id) => id,
             None => continue,
         };
-
-        // Clone and prune a working copy.  NodeIds are preserved.
-        let mut work =
-            prune_unwanted_nodes(doc, selector::discard::DISCARDED_COMMENTS, false);
         work.strip_tags(sub_id, &["a", "span"]);
 
         // Extract comment nodes.
@@ -355,8 +364,8 @@ pub fn extract_comments(
         }
 
         if result_elems.len() > batch_start {
-            // Remove the comment section from the original document.
-            doc.remove(sub_id, false);
+            // Remove the comment section from the original document using its NodeId in `doc`.
+            doc.remove(sub_id_in_doc, false);
             break 'comment_loop;
         }
     }
