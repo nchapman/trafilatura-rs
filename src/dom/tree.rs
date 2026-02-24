@@ -428,6 +428,37 @@ impl Document {
         }
     }
 
+    /// Collects all HTML comment node IDs in subtree order.
+    ///
+    /// Port of `removeHtmlCommentNode` (collection half).
+    pub fn collect_comment_nodes(&self, root: NodeId) -> Vec<NodeId> {
+        let mut result = Vec::new();
+        self.collect_comment_nodes_inner(root, &mut result);
+        result
+    }
+
+    fn collect_comment_nodes_inner(&self, id: NodeId, out: &mut Vec<NodeId>) {
+        let Some(node) = self.tree.get(id) else { return };
+        for child in node.children().map(|c| c.id()).collect::<Vec<_>>() {
+            if let Some(Node::Comment(_)) = self.tree.get(child).map(|n| n.value()) {
+                out.push(child);
+            } else {
+                self.collect_comment_nodes_inner(child, out);
+            }
+        }
+    }
+
+    /// Removes a comment node (no tail to preserve).
+    ///
+    /// Port of `removeHtmlCommentNode` (removal half).
+    pub fn remove_comment(&mut self, id: NodeId) {
+        if let Some(node) = self.tree.get(id) {
+            if matches!(node.value(), Node::Comment(_)) {
+                self.tree.get_mut(id).unwrap().detach();
+            }
+        }
+    }
+
     /// Removes elements with any of the given tags *and* all their children.
     ///
     /// Port of `etree.StripElements`.
