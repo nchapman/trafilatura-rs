@@ -3,7 +3,7 @@
 mod tree;
 mod query;
 
-use ego_tree::NodeId;
+pub use ego_tree::NodeId;
 use scraper::Node;
 
 /// A parsed HTML document backed by an ego-tree.
