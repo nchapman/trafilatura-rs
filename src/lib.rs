@@ -10,16 +10,18 @@ pub mod selector;
 pub mod settings;
 pub mod utils;
 
+// Convenience re-exports for library users and the CLI binary.
+pub use error::TrafilaturaError;
+pub use options::{Config, ExtractionFocus, FallbackCandidates, HtmlDateMode, Options};
+pub use result::{ExtractResult, Metadata};
+
 use crate::dom::Document;
-use crate::error::TrafilaturaError;
 use crate::extraction::{
     baseline::baseline,
     external::compare_external_extraction,
     html_processing::{convert_tags, doc_cleaning, post_cleaning, prune_unwanted_nodes},
     {extract_comments, extract_content},
 };
-use crate::options::{ExtractionFocus, Options};
-use crate::result::ExtractResult;
 use crate::settings::FORMAT_TAG_CATALOG;
 use crate::utils::{
     language::{check_html_language, language_classifier},
