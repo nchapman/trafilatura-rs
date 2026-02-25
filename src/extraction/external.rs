@@ -37,26 +37,51 @@ pub fn compare_external_extraction(
     // The extracted_doc is the full HTML document returned by extract_content.
     // Use the <body> as the text source to avoid counting <title>/<head> text,
     // matching Go's behaviour where extractedDoc is the <body> fragment.
-    let text_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
-    let extracted_text = trim(&extracted_doc.iter_text(text_root, " "));
-    let len_extracted = extracted_text.chars().count();
+    let compute_len = |doc: &Document| -> (usize, String) {
+        let root = doc.body().unwrap_or_else(|| doc.root());
+        let text = trim(&doc.iter_text(root, " "));
+        let len = text.chars().count();
+        (len, text)
+    };
+
+    let (initial_len, initial_text) = compute_len(&extracted_doc);
     let mut extracted_doc = extracted_doc;
 
     // Bypass for FavorRecall when we already have plenty of text.
     if opts.focus == ExtractionFocus::FavorRecall
-        && len_extracted > opts.config.min_extracted_size * 10
+        && initial_len > opts.config.min_extracted_size * 10
     {
-        return (extracted_doc, extracted_text);
+        return (extracted_doc, initial_text);
     }
 
     // Serialize the original doc to an HTML string for readability input.
     // In Go this is `dom.Clone(originalDoc, true)` + optional `pruneUnwantedNodes`.
     // We must get the <html> element (not the document root, which is not an element node).
-    let html_root = original_doc.get_elements_by_tag_name(original_doc.root(), "html")
+    let html_root = original_doc
+        .get_elements_by_tag_name(original_doc.root(), "html")
         .into_iter()
         .next()
         .unwrap_or_else(|| original_doc.root());
     let cleaned_html = original_doc.outer_html(html_root);
+
+    // Current length (may change after each candidate check).
+    let mut len_extracted = initial_len;
+
+    // Try user-provided fallback candidates first (FallbackCandidates.readability_html).
+    // Port of go-trafilatura's FallbackCandidates.Readability handling.
+    if let Some(candidates) = &opts.fallback_candidates {
+        if let Some(ref html) = candidates.readability_html {
+            let candidate_doc = Document::parse(html);
+            let cand_root = candidate_doc.body().unwrap_or_else(|| candidate_doc.root());
+            let candidate_text = trim(&candidate_doc.iter_text(cand_root, " "));
+            let len_candidate = candidate_text.chars().count();
+
+            if candidate_is_usable(&candidate_doc, &extracted_doc, len_candidate, len_extracted, opts) {
+                extracted_doc = candidate_doc;
+                len_extracted = len_candidate;
+            }
+        }
+    }
 
     // Try readability fallback generator only when our own extraction is empty.
     //
@@ -86,9 +111,9 @@ pub fn compare_external_extraction(
 
     // Final cleaning of the extraction result.
     sanitize_tree(&mut extracted_doc, opts);
-    let text_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
-    let extracted_text = trim(&extracted_doc.iter_text(text_root, " "));
-    (extracted_doc, extracted_text)
+    let final_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
+    let final_text = trim(&extracted_doc.iter_text(final_root, " "));
+    (extracted_doc, final_text)
 }
 
 /// Run the `readable-readability` algorithm on the provided HTML string and return the
@@ -390,5 +415,62 @@ mod tests {
         let root = result_doc.root();
         assert!(result_doc.query_selector(root, "aside").is_none(), "aside removed by sanitize");
         assert!(result_doc.query_selector(root, "span").is_none(), "span stripped by sanitize");
+    }
+
+    // ---- FallbackCandidates ----
+
+    #[test]
+    fn test_fallback_candidates_readability_html_used_when_extraction_empty() {
+        // Our extraction is empty; a rich readability_html candidate should be adopted.
+        let original = doc("<html><body></body></html>");
+        let extracted = doc("<html><body></body></html>");
+
+        let candidate_body = "word ".repeat(60); // 300 chars > min_extracted_size(250)
+        let candidate_html = format!("<html><body><p>{candidate_body}</p></body></html>");
+
+        let mut opts = default_opts();
+        opts.enable_fallback = true;
+        opts.fallback_candidates = Some(crate::options::FallbackCandidates {
+            readability_html: Some(candidate_html),
+        });
+
+        let (_, text) = compare_external_extraction(&original, extracted, &opts);
+        assert!(
+            text.len() > 100,
+            "fallback candidate should be adopted when extraction is empty, got: {text:?}"
+        );
+    }
+
+    #[test]
+    fn test_fallback_candidates_not_used_when_extraction_much_larger() {
+        // Our extraction is already large; candidate should NOT replace it.
+        let original = doc("<html><body></body></html>");
+        let long_body = "word ".repeat(200); // 1000 chars >> 2x candidate
+        let extracted = doc(&format!("<html><body><p>{long_body}</p></body></html>"));
+
+        let short_candidate = "short".to_string();
+        let candidate_html = format!("<html><body><p>{short_candidate}</p></body></html>");
+
+        let mut opts = default_opts();
+        opts.enable_fallback = true;
+        opts.fallback_candidates = Some(crate::options::FallbackCandidates {
+            readability_html: Some(candidate_html),
+        });
+
+        let (_, text) = compare_external_extraction(&original, extracted, &opts);
+        assert!(
+            text.contains("word"),
+            "large extraction should be kept, not replaced by small candidate"
+        );
+    }
+
+    #[test]
+    fn test_fallback_candidates_none_does_not_panic() {
+        // Passing no fallback_candidates should work normally.
+        let original = doc("<html><body></body></html>");
+        let extracted = doc("<html><body><p>Some content here</p></body></html>");
+        let opts = default_opts();
+        let (_, text) = compare_external_extraction(&original, extracted, &opts);
+        assert!(text.contains("Some content"), "extraction should survive when no candidates");
     }
 }

@@ -9,6 +9,29 @@ pub enum ExtractionFocus {
     FavorPrecision,
 }
 
+/// Controls how date extraction behaves.
+/// Port of HtmlDateMode in go-trafilatura.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HtmlDateMode {
+    /// Default: use Fast mode (meta + JSON-LD only).
+    #[default]
+    Default,
+    /// Fast: meta elements and JSON-LD only (current behavior).
+    Fast,
+    /// Extensive: also scan body text for dates (not yet implemented, behaves like Fast).
+    Extensive,
+    /// Disabled: skip date extraction entirely.
+    Disabled,
+}
+
+/// User-provided fallback content for when main extraction yields too little.
+/// Port of FallbackCandidates in go-trafilatura.
+#[derive(Debug, Clone, Default)]
+pub struct FallbackCandidates {
+    /// Pre-extracted HTML string from Readability or similar.
+    pub readability_html: Option<String>,
+}
+
 /// Advanced tuning parameters for the extraction algorithm.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -53,4 +76,10 @@ pub struct Options {
     pub max_tree_size: Option<usize>,
     pub prune_selector: Option<String>,
     pub enable_log: bool,
+    /// Controls date extraction behavior.
+    pub html_date_mode: HtmlDateMode,
+    /// If set, use this date directly instead of extracting.
+    pub html_date_override: Option<chrono::NaiveDate>,
+    /// User-provided fallback candidates for content extraction.
+    pub fallback_candidates: Option<FallbackCandidates>,
 }

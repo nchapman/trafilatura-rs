@@ -157,12 +157,6 @@ pub fn unescape_html(s: &str) -> String {
             entity.push(ec);
         }
 
-        if !found_semi {
-            result.push('&');
-            result.push_str(&entity);
-            continue;
-        }
-
         let decoded: Option<&str> = match entity.as_str() {
             "amp" => Some("&"),
             "lt" => Some("<"),
@@ -186,7 +180,8 @@ pub fn unescape_html(s: &str) -> String {
             continue;
         }
 
-        // Numeric character references.
+        // Numeric character references — valid both with and without semicolon
+        // (HTML5 spec §13.2.5.72 allows omitting ';' for numeric refs).
         if let Some(stripped) = entity.strip_prefix('#') {
             let cp = if let Some(hex) = stripped.strip_prefix('x').or_else(|| stripped.strip_prefix('X')) {
                 u32::from_str_radix(hex, 16).ok()
@@ -199,7 +194,14 @@ pub fn unescape_html(s: &str) -> String {
             }
         }
 
-        // Unknown entity — emit literally.
+        if !found_semi {
+            // Named entity without semicolon and not a known legacy entity — emit literally.
+            result.push('&');
+            result.push_str(&entity);
+            continue;
+        }
+
+        // Unknown entity with semicolon — emit literally.
         result.push('&');
         result.push_str(&entity);
         result.push(';');

@@ -9,7 +9,7 @@ use chrono::Datelike;
 use regex::Regex;
 
 use crate::dom::Document;
-use crate::options::Options;
+use crate::options::{HtmlDateMode, Options};
 use crate::result::Metadata;
 use crate::selector::metadata::{
     META_AUTHOR, META_AUTHOR_DISCARD, META_CATEGORIES, META_TAGS, META_TITLE,
@@ -228,6 +228,15 @@ static DATE_YMD_RE: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+/// Regex for extracting a YYYY/MM/DD or YYYY-MM-DD date from a URL path.
+/// Port of rxCompleteUrl in go-htmldate (uses [/_-] separators, no dot).
+static DATE_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)\D((?:199[0-9]|20[0-3][0-9]))[/_\-]([0-1]?[0-9])[/_\-]([0-3]?[0-9])(?:\D|$)",
+    )
+    .unwrap()
+});
+
 /// Regex for YYYYMMDD without separator.
 static DATE_NO_SEP_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?:\D|^)(\d{8})(?:\D|$)").unwrap());
@@ -297,8 +306,18 @@ pub fn extract_metadata(doc: &Document, opts: &Options) -> Metadata {
         }
     }
 
-    // Date extraction (port of go-htmldate fast mode: UseOriginalDate=true, SkipExtensiveSearch=true).
-    metadata.date = extract_date(doc);
+    // Date extraction — honour override and mode flags.
+    metadata.date = if let Some(override_date) = opts.html_date_override {
+        // User supplied a date directly; skip all extraction.
+        Some(override_date)
+    } else if opts.html_date_mode == HtmlDateMode::Disabled {
+        // Caller opted out of date extraction.
+        None
+    } else {
+        // Default / Fast / Extensive: use meta + JSON-LD (Extensive is not yet implemented,
+        // so it falls back to the same fast path as Default and Fast).
+        extract_date(doc)
+    };
 
     // Sitename fallback via DOM.
     if metadata.sitename.is_empty() {
@@ -947,7 +966,13 @@ fn examine_meta_date(doc: &Document) -> Option<chrono::NaiveDate> {
             .unwrap_or_default();
 
         if !name.is_empty() && !content.is_empty() {
-            if DATE_ATTRIBUTES.contains(name.as_str()) {
+            if name == "og:url" {
+                // Extract date from URL path and store as reserve candidate.
+                // Port of the og:url branch in go-htmldate/core.go (examineMetaElements).
+                if reserve.is_none() {
+                    reserve = extract_url_date(val);
+                }
+            } else if DATE_ATTRIBUTES.contains(name.as_str()) {
                 // name in dateAttributes → always main date (UseOriginalDate=true)
                 if let Some(d) = fast_parse_date(val) {
                     return Some(d);
@@ -961,7 +986,13 @@ fn examine_meta_date(doc: &Document) -> Option<chrono::NaiveDate> {
         } else if !property.is_empty() && !content.is_empty() {
             let in_date = DATE_ATTRIBUTES.contains(property.as_str());
             let in_mod = PROPERTY_MODIFIED.contains(property.as_str());
-            if in_date {
+            if property == "og:url" {
+                // Extract date from URL path and store as reserve candidate.
+                // Port of the og:url branch in go-htmldate/core.go (examineMetaElements).
+                if reserve.is_none() {
+                    reserve = extract_url_date(val);
+                }
+            } else if in_date {
                 // dateAttributes property → main date (UseOriginalDate=true)
                 if let Some(d) = fast_parse_date(val) {
                     return Some(d);
@@ -1084,6 +1115,25 @@ fn collect_json_dates(
             }
             _ => {}
         }
+    }
+}
+
+/// Extracts a date from a URL path using the YYYY/MM/DD pattern.
+///
+/// Port of `extractUrlDate` in go-htmldate (uses `rxCompleteUrl`).
+fn extract_url_date(url: &str) -> Option<chrono::NaiveDate> {
+    use chrono::NaiveDate;
+
+    let caps = DATE_URL_RE.captures(url)?;
+    let y: i32 = caps[1].parse().ok()?;
+    let m: u32 = caps[2].parse().ok()?;
+    let d: u32 = caps[3].parse().ok()?;
+
+    let date = NaiveDate::from_ymd_opt(y, m, d)?;
+    if is_plausible_date(date) {
+        Some(date)
+    } else {
+        None
     }
 }
 
@@ -1409,5 +1459,91 @@ mod tests {
     fn test_normalize_authors_hyphenated_name() {
         let result = normalize_authors("", "anne-marie dupont");
         assert!(result.contains("Anne-Marie"), "got: {result}");
+    }
+
+    // ---------------------------------------------------------------------------
+    // HtmlDateMode and html_date_override
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_html_date_mode_disabled_skips_date_extraction() {
+        let html = r#"<html><head>
+            <meta property="article:published_time" content="2022-03-15"/>
+        </head><body></body></html>"#;
+        let doc = parse(html);
+        let mut opts = Options::default();
+        opts.html_date_mode = HtmlDateMode::Disabled;
+        let meta = extract_metadata(&doc, &opts);
+        assert!(meta.date.is_none(), "Disabled mode should skip date extraction");
+    }
+
+    #[test]
+    fn test_html_date_override_takes_precedence() {
+        let html = r#"<html><head>
+            <meta property="article:published_time" content="2022-03-15"/>
+        </head><body></body></html>"#;
+        let doc = parse(html);
+        let override_date = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        let mut opts = Options::default();
+        opts.html_date_override = Some(override_date);
+        let meta = extract_metadata(&doc, &opts);
+        assert_eq!(meta.date, Some(override_date), "Override date should be used verbatim");
+    }
+
+    #[test]
+    fn test_html_date_mode_fast_extracts_date() {
+        let html = r#"<html><head>
+            <meta property="article:published_time" content="2022-03-15"/>
+        </head><body></body></html>"#;
+        let doc = parse(html);
+        let mut opts = Options::default();
+        opts.html_date_mode = HtmlDateMode::Fast;
+        let meta = extract_metadata(&doc, &opts);
+        let expected = chrono::NaiveDate::from_ymd_opt(2022, 3, 15).unwrap();
+        assert_eq!(meta.date, Some(expected));
+    }
+
+    // ---------------------------------------------------------------------------
+    // og:url date extraction
+    // ---------------------------------------------------------------------------
+
+    /// Port of the Go test: `og:url` with a date path → date=2017-09-01
+    #[test]
+    fn test_og_url_property_date_extraction() {
+        let html = r#"<html><head>
+            <meta property="og:url" content="https://example.org/2017/09/01/content.html"/>
+        </head><body></body></html>"#;
+        let doc = parse(html);
+        let opts = Options::default();
+        let meta = extract_metadata(&doc, &opts);
+        let expected = chrono::NaiveDate::from_ymd_opt(2017, 9, 1).unwrap();
+        assert_eq!(meta.date, Some(expected), "Date should be extracted from og:url path");
+    }
+
+    /// og:url without a date in the path should not produce a date.
+    #[test]
+    fn test_og_url_no_date_produces_no_date() {
+        let html = r#"<html><head>
+            <meta property="og:url" content="https://example.org/about/"/>
+        </head><body></body></html>"#;
+        let doc = parse(html);
+        let opts = Options::default();
+        let meta = extract_metadata(&doc, &opts);
+        assert!(meta.date.is_none(), "URL without date should not produce a date");
+    }
+
+    /// A stronger publication-time meta should win over og:url.
+    #[test]
+    fn test_publication_meta_takes_priority_over_og_url() {
+        let html = r#"<html><head>
+            <meta property="article:published_time" content="2020-06-01"/>
+            <meta property="og:url" content="https://example.org/2017/09/01/content.html"/>
+        </head><body></body></html>"#;
+        let doc = parse(html);
+        let opts = Options::default();
+        let meta = extract_metadata(&doc, &opts);
+        // article:published_time is in DATE_ATTRIBUTES → always returned first (main date).
+        let expected = chrono::NaiveDate::from_ymd_opt(2020, 6, 1).unwrap();
+        assert_eq!(meta.date, Some(expected), "article:published_time beats og:url reserve date");
     }
 }

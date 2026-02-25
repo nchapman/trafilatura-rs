@@ -203,6 +203,72 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
 }
 
 // ---------------------------------------------------------------------------
+// Readable document builder
+// ---------------------------------------------------------------------------
+
+/// Creates a complete HTML document from an `ExtractResult`, with metadata in `<head>`
+/// and content/comments in `<body>`.
+///
+/// Port of `CreateReadableDocument` in go-trafilatura/helper.go.
+pub fn create_readable_document(result: &ExtractResult) -> String {
+    let m = &result.metadata;
+
+    let escape = |s: &str| {
+        s.replace('&', "&amp;")
+            .replace('"', "&quot;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+    };
+
+    let date_str = match m.date {
+        Some(d) => d.format("%Y-%m-%d").to_string(),
+        None => String::new(),
+    };
+
+    let categories = m.categories.join(", ");
+    let tags = m.tags.join("; ");
+
+    let mut html = String::with_capacity(1024);
+    html.push_str("<html><head>");
+
+    for (name, value) in &[
+        ("title", m.title.as_str()),
+        ("author", m.author.as_str()),
+        ("url", m.url.as_str()),
+        ("hostname", m.hostname.as_str()),
+        ("description", m.description.as_str()),
+        ("sitename", m.sitename.as_str()),
+        ("date", date_str.as_str()),
+        ("categories", categories.as_str()),
+        ("tags", tags.as_str()),
+        ("license", m.license.as_str()),
+    ] {
+        html.push_str(r#"<meta name=""#);
+        html.push_str(name);
+        html.push_str(r#"" content=""#);
+        html.push_str(&escape(value));
+        html.push_str(r#""/>"#);
+    }
+
+    html.push_str("</head><body>");
+
+    if !result.content_html.is_empty() {
+        html.push_str(r#"<div id="content-body">"#);
+        html.push_str(&result.content_html);
+        html.push_str("</div>");
+    }
+
+    if !result.comments_html.is_empty() {
+        html.push_str(r#"<div id="comments-body">"#);
+        html.push_str(&result.comments_html);
+        html.push_str("</div>");
+    }
+
+    html.push_str("</body></html>");
+    html
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -404,5 +470,100 @@ mod tests {
             matches!(result, Err(TrafilaturaError::LanguageMismatch { .. })),
             "should reject content when detected language != target language"
         );
+    }
+
+    // ---------------------------------------------------------------------------
+    // create_readable_document
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_create_readable_document_structure() {
+        let result = ExtractResult {
+            content_text: "Hello world".into(),
+            comments_text: String::new(),
+            content_html: "<p>Hello world</p>".into(),
+            comments_html: String::new(),
+            metadata: crate::result::Metadata {
+                title: "My Title".into(),
+                author: "Jane Doe".into(),
+                url: "https://example.com/article".into(),
+                hostname: "example.com".into(),
+                description: "A description".into(),
+                sitename: "Example".into(),
+                date: chrono::NaiveDate::from_ymd_opt(2023, 4, 5),
+                categories: vec!["Tech".into(), "News".into()],
+                tags: vec!["rust".into(), "web".into()],
+                license: "CC BY 4.0".into(),
+                ..Default::default()
+            },
+        };
+
+        let html = create_readable_document(&result);
+
+        // Should have proper HTML shell.
+        assert!(html.starts_with("<html><head>"), "should start with html/head");
+        assert!(html.ends_with("</body></html>"), "should end with /body/html");
+
+        // Meta tags.
+        assert!(html.contains(r#"name="title" content="My Title""#));
+        assert!(html.contains(r#"name="author" content="Jane Doe""#));
+        assert!(html.contains(r#"name="url" content="https://example.com/article""#));
+        assert!(html.contains(r#"name="hostname" content="example.com""#));
+        assert!(html.contains(r#"name="description" content="A description""#));
+        assert!(html.contains(r#"name="sitename" content="Example""#));
+        assert!(html.contains(r#"name="date" content="2023-04-05""#));
+        assert!(html.contains(r#"name="categories" content="Tech, News""#));
+        assert!(html.contains(r#"name="tags" content="rust; web""#));
+        assert!(html.contains(r#"name="license" content="CC BY 4.0""#));
+
+        // Content div.
+        assert!(html.contains(r#"<div id="content-body">"#));
+        assert!(html.contains("<p>Hello world</p>"));
+
+        // No empty comments div when comments_html is empty.
+        assert!(!html.contains(r#"id="comments-body""#));
+    }
+
+    #[test]
+    fn test_create_readable_document_with_comments() {
+        let result = ExtractResult {
+            content_html: "<p>Article</p>".into(),
+            comments_html: "<p>A comment</p>".into(),
+            ..Default::default()
+        };
+
+        let html = create_readable_document(&result);
+        assert!(html.contains(r#"<div id="comments-body">"#));
+        assert!(html.contains("<p>A comment</p>"));
+    }
+
+    #[test]
+    fn test_create_readable_document_no_date() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            ..Default::default()
+        };
+
+        let html = create_readable_document(&result);
+        // Date meta tag should exist but have empty content.
+        assert!(html.contains(r#"name="date" content="""#));
+    }
+
+    #[test]
+    fn test_create_readable_document_escapes_special_chars() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            metadata: crate::result::Metadata {
+                title: r#"Title with "quotes" & <tags>"#.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let html = create_readable_document(&result);
+        // The title value in the attribute should be escaped.
+        assert!(html.contains("&quot;quotes&quot;"));
+        assert!(html.contains("&amp;"));
+        assert!(html.contains("&lt;tags&gt;"));
     }
 }

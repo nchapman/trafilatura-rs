@@ -60,7 +60,16 @@ pub fn handle_titles(
             let saved_tail = doc.tail(child_id);
             let result = handle_text_node(doc, child_id, Some(cache), false, false, opts);
             if result.is_none() {
+                // Child was discarded: restore original text and tail so that
+                // inner_html still includes whatever the original element contributed
+                // (Go appends the original clone even when processedChild is nil).
                 doc.set_text(child_id, &saved_text);
+                doc.set_tail(child_id, &saved_tail);
+            } else {
+                // Child was kept: restore the tail verbatim to preserve
+                // inter-element text (e.g. " Operator" after <code>in</code>).
+                // Go works with separate text nodes so trim() never removes the
+                // leading space; in our text/tail model we must do this explicitly.
                 doc.set_tail(child_id, &saved_tail);
             }
             // Note: children are marked "done" AFTER inner_html is captured below.
@@ -166,7 +175,19 @@ fn process_nested_element(
                 let tail = trim(&doc.tail(sub_id));
                 let stag = doc.tag_name(sub_id).to_string();
                 if !sub_text.is_empty() {
-                    inner.push_str(&format!("<{stag}>{sub_text}</{stag}>"));
+                    // Port of addSubElement: copy attributes from the original element
+                    // to the serialised sub-element HTML (Go: subChildElement.Attr = subElement.Attr).
+                    // For link elements this preserves href/target; for others the
+                    // attribute list is typically empty after handle_text_node cleared them.
+                    let attrs_html: String = doc
+                        .attribute_names(sub_id)
+                        .into_iter()
+                        .filter_map(|name| {
+                            doc.get_attribute(sub_id, &name)
+                                .map(|val| format!(" {}=\"{}\"", name, escape_attr(&val)))
+                        })
+                        .collect();
+                    inner.push_str(&format!("<{stag}{attrs_html}>{sub_text}</{stag}>"));
                 }
                 if !tail.is_empty() {
                     inner.push(' ');
@@ -537,7 +558,11 @@ pub fn handle_paragraphs(
         if text.is_empty() {
             return None;
         }
-        return Some(format!("<p>{text}</p>"));
+        // Mirror Go's `etree.SetTail(processedElement, etree.Tail(element))`:
+        // include element's tail so sibling text (e.g. after a nested <p>) is preserved.
+        let tail = trim(&doc.tail(id));
+        let tail_part = if !tail.is_empty() { format!(" {tail}") } else { String::new() };
+        return Some(format!("<p>{text}</p>{tail_part}"));
     }
 
     // Complex case: paragraph has child elements.
@@ -651,13 +676,22 @@ pub fn handle_paragraphs(
         // serialising the inner HTML first, then marking the in-doc nodes as done.
         let inner = doc.inner_html(id);
         tracing::debug!("keeping p-child: {inner}");
+        // Mirror Go's `etree.SetTail(processedElement, etree.Tail(element))`:
+        // include the element's tail text in the result so that sibling text nodes
+        // (e.g. ", CCC." after a nested <p> in malformed HTML) are not lost.
+        let tail = trim(&doc.tail(id));
+        let tail_part = if !tail.is_empty() {
+            format!(" {tail}")
+        } else {
+            String::new()
+        };
         // Mark all element children as done to prevent re-processing.
         for &child_id in &all_elem_children {
             if doc.tag_name(child_id) != "done" {
                 doc.set_tag_name(child_id, "done");
             }
         }
-        return Some(format!("<p>{inner}</p>"));
+        return Some(format!("<p>{inner}</p>{tail_part}"));
     }
 
     tracing::debug!("discarding p-child: {}", doc.outer_html(id));
