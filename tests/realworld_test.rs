@@ -951,4 +951,74 @@ fn test_extract_pcgamer_skyrim_with_links() {
         || html_contains(&result, "<em>Legends </em>don't destroy <em>houses</em>,")
     );
 }
+/// Port of `Test_ExoticTags` from trafilatura_test.go.
+///
+/// Covers edge cases with specially crafted HTML and the exotic_tags.html fixture.
+#[test]
+fn test_extract_exotic_tags() {
+    // Fixture: teletype text and inline content
+    let result = extract_mock_file("http://exotic_tags", false).expect("exotic_tags fixture should extract");
+    assert!(res_contains(&result, "Teletype text"));
+    assert!(res_contains(&result, "My new car is silver."));
+
+    // Misformed HTML declaration
+    let html = r#"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 2012"http://www.w3.org/TR/html4/loose.dtd"><html><head></head><body><p>ABC</p></body></html>"#;
+    let result = trafilatura::extract(html, trafilatura::options::Options::default())
+        .expect("misformed doctype should still extract");
+    assert!(result.content_text.contains("ABC"));
+
+    // Naked div with <br>: content should be joined with spaces.
+    // Uses zero config (MinExtractedSize=0) to match Go's zeroConfig in Test_ExoticTags.
+    let html = "<html><body><main><div>1.<br/>2.<br/>3.<br/></div></main></body></html>";
+    let zero_opts = trafilatura::options::Options {
+        config: trafilatura::options::Config { min_extracted_size: 0, ..Default::default() },
+        ..Default::default()
+    };
+    let result = trafilatura::extract(html, zero_opts).expect("naked div with br should extract");
+    assert!(result.content_text.contains("1. 2. 3."));
+
+    // HTML5 <details>/<summary>: both summary and body should be extracted
+    let html = r#"<html><body><article><details><summary>Epcot Center</summary><p>Epcot is a theme park at Walt Disney World Resort featuring exciting attractions, international pavilions, award-winning fireworks and seasonal special events.</p></details></article></body></html>"#;
+    let result = trafilatura::extract(html, trafilatura::options::Options::default())
+        .expect("details element should extract");
+    assert!(result.content_text.contains("Epcot Center"));
+    assert!(result.content_text.contains("award-winning fireworks"));
+
+    // Empty <a> inside <strong> must not cause empty output
+    let html = r#"<html><body><div><h1>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</h1><h2>Sed et interdum lectus.</h2><p>Quisque molestie nunc eu arcu condimentum fringilla.</p><strong><a></a></strong><h2>Aliquam eget interdum elit, id posuere ipsum.</h2><p>Phasellus lectus erat, hendrerit sed tortor ac, dignissim vehicula metus.<br/></p></div></body></html>"#;
+    let opts = trafilatura::options::Options {
+        include_links: true,
+        include_images: true,
+        ..Default::default()
+    };
+    let result = trafilatura::extract(html, opts).expect("empty-a inside strong should not crash");
+    assert!(!result.content_text.is_empty());
+
+    // <em> improperly wrapping <p>: inner text must be extracted; result must end with "Text here"
+    let html = r#"<html><body><div id="content"><h1>A header</h1><h2>Very specific bug so odd</h2><h3>Nested header</h3><p>Some "hyphenated-word quote" followed by a bit more text line.</p><em><p>em improperly wrapping p here</p></em><p>Text here<br/></p><h3>More articles</h3></div></body></html>"#;
+    for focus in [
+        trafilatura::options::ExtractionFocus::Balanced,
+        trafilatura::options::ExtractionFocus::FavorRecall,
+        trafilatura::options::ExtractionFocus::FavorPrecision,
+    ] {
+        let opts = trafilatura::options::Options {
+            include_links: true,
+            include_images: true,
+            focus,
+            ..Default::default()
+        };
+        let result = trafilatura::extract(html, opts)
+            .unwrap_or_else(|_| panic!("em-wrapping-p should extract (focus={focus:?})"));
+        assert!(
+            result.content_text.contains("em improperly wrapping p here"),
+            "focus={focus:?}: expected 'em improperly wrapping p here'"
+        );
+        assert!(
+            result.content_text.ends_with("Text here"),
+            "focus={focus:?}: expected content to end with 'Text here', got: {:?}",
+            result.content_text
+        );
+    }
+}
+
 // end of real-world tests
