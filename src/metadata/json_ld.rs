@@ -139,7 +139,7 @@ pub fn extract_json_ld(opts: &Options, doc: &Document, original_metadata: Metada
     // Merge into original metadata.
     // JSON-LD overrides original for author (JSON-LD is more structured).
     let mut result = original_metadata;
-    result.title = str_or(&[&metadata.title, &result.title]).to_string();
+    result.title = str_or(&[&result.title, &metadata.title]).to_string();
     result.page_type = str_or(&[&result.page_type, &metadata.page_type]).to_string();
     result.author = str_or(&[&metadata.author, &result.author]).to_string();
 

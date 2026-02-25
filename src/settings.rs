@@ -95,8 +95,7 @@ pub static XML_LB_TAGS: LazyLock<HashSet<&'static str>> =
 
 pub static XML_HI_TAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "em", "i", "b", "strong", "u", "kbd", "samp", "tt", "var", "sub", "sup", "mark", "a",
-        "span",
+        "em", "i", "b", "strong", "u", "kbd", "samp", "tt", "var", "sub", "sup", "mark",
     ]
     .into_iter()
     .collect()
@@ -106,7 +105,7 @@ pub static XML_REF_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["a"].into_iter().collect());
 
 pub static XML_GRAPHIC_TAGS: LazyLock<HashSet<&'static str>> =
-    LazyLock::new(|| ["img", "figure", "picture", "source"].into_iter().collect());
+    LazyLock::new(|| ["img"].into_iter().collect());
 
 pub static XML_ITEM_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["li", "dt", "dd"].into_iter().collect());
