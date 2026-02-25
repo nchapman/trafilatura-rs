@@ -420,11 +420,28 @@ impl Document {
     ///
     /// Port of `etree.StripTags`. Processes in reverse to avoid parent-before-child issues.
     pub fn strip_tags(&mut self, root: NodeId, tags: &[&str]) {
-        for &tag in tags {
-            let to_strip: Vec<NodeId> = self.get_elements_by_tag_name(root, tag);
+        if tags.is_empty() {
+            return;
+        }
+        // Single-tag fast path avoids collecting all elements.
+        if tags.len() == 1 {
+            let to_strip = self.get_elements_by_tag_name(root, tags[0]);
             for id in to_strip.into_iter().rev() {
                 self.strip(id);
             }
+            return;
+        }
+        // Multi-tag: one full traversal, filter by HashSet — O(N) instead of O(T*N).
+        let tag_set: std::collections::HashSet<&str> = tags.iter().copied().collect();
+        let all = self.get_elements_by_tag_name(root, "*");
+        let mut to_strip = Vec::new();
+        for id in all {
+            if tag_set.contains(self.tag_name(id)) {
+                to_strip.push(id);
+            }
+        }
+        for id in to_strip.into_iter().rev() {
+            self.strip(id);
         }
     }
 
@@ -463,11 +480,28 @@ impl Document {
     ///
     /// Port of `etree.StripElements`.
     pub fn strip_elements(&mut self, root: NodeId, keep_tail: bool, tags: &[&str]) {
-        for &tag in tags {
-            let to_remove: Vec<NodeId> = self.get_elements_by_tag_name(root, tag);
+        if tags.is_empty() {
+            return;
+        }
+        // Single-tag fast path avoids collecting all elements.
+        if tags.len() == 1 {
+            let to_remove = self.get_elements_by_tag_name(root, tags[0]);
             for id in to_remove.into_iter().rev() {
                 self.remove(id, keep_tail);
             }
+            return;
+        }
+        // Multi-tag: one full traversal, filter by HashSet — O(N) instead of O(T*N).
+        let tag_set: std::collections::HashSet<&str> = tags.iter().copied().collect();
+        let all = self.get_elements_by_tag_name(root, "*");
+        let mut to_remove = Vec::new();
+        for id in all {
+            if tag_set.contains(self.tag_name(id)) {
+                to_remove.push(id);
+            }
+        }
+        for id in to_remove.into_iter().rev() {
+            self.remove(id, keep_tail);
         }
     }
 }

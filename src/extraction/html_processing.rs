@@ -48,28 +48,24 @@ pub fn doc_cleaning(doc: &mut Document, opts: &Options) {
     }
 
     // Strip tags in stripping list (remove tag, keep children and tail).
-    let strip_tags: Vec<&str> = stripping_list.iter().copied().collect();
-    for tag in &strip_tags {
-        doc.strip_tags(doc.root(), &[tag]);
-    }
+    // Pass the full set in one call — strip_tags does a single O(N) traversal.
+    let strip_tags_vec: Vec<&str> = stripping_list.iter().copied().collect();
+    doc.strip_tags(doc.root(), &strip_tags_vec);
 
     // Prevent removal of paragraphs when in recall mode.
+    let cleaning_vec: Vec<&str> = cleaning_list.iter().copied().collect();
     if opts.focus == ExtractionFocus::FavorRecall
         && !doc.get_elements_by_tag_name(doc.root(), "p").is_empty()
     {
         let backup = doc.clone_document();
-        for tag in &cleaning_list.iter().copied().collect::<Vec<_>>() {
-            doc.strip_elements(doc.root(), false, &[tag]);
-        }
+        doc.strip_elements(doc.root(), false, &cleaning_vec);
 
         // If paragraphs were removed, restore backup.
         if doc.get_elements_by_tag_name(doc.root(), "p").is_empty() {
             *doc = backup;
         }
     } else {
-        for tag in &cleaning_list.iter().copied().collect::<Vec<_>>() {
-            doc.strip_elements(doc.root(), false, &[tag]);
-        }
+        doc.strip_elements(doc.root(), false, &cleaning_vec);
     }
 
     // Remove HTML comment nodes.
