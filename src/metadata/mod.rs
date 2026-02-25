@@ -5,6 +5,9 @@ pub mod json_ld;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
+use chrono::Datelike;
+use regex::Regex;
+
 use crate::dom::Document;
 use crate::options::Options;
 use crate::result::Metadata;
@@ -92,6 +95,144 @@ static URL_SELECTORS: &[&str] = &[
 ];
 
 // ---------------------------------------------------------------------------
+// Date attribute sets (ported from go-htmldate/constant.go)
+// ---------------------------------------------------------------------------
+
+/// Meta `name`/`property` attributes indicating original/publication date.
+/// Port of `dateAttributes` in go-htmldate.
+static DATE_ATTRIBUTES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    [
+        "analyticsattributes.articledate",
+        "article.created",
+        "article_date_original",
+        "article:post_date",
+        "article.published",
+        "article:published",
+        "article:published_date",
+        "article:published_time",
+        "article:publicationdate",
+        "bt:pubdate",
+        "citation_date",
+        "citation_publication_date",
+        "content_create_date",
+        "created",
+        "cxenseparse:recs:publishtime",
+        "date",
+        "date_created",
+        "date_published",
+        "datecreated",
+        "dateposted",
+        "datepublished",
+        "dc.date",
+        "dc.created",
+        "dc.date.created",
+        "dc.date.issued",
+        "dc.date.publication",
+        "dcsext.articlefirstpublished",
+        "dcterms.created",
+        "dcterms.date",
+        "dcterms.issued",
+        "dc:created",
+        "dc:date",
+        "displaydate",
+        "doc_date",
+        "field-name-post-date",
+        "gentime",
+        "mediator_published_time",
+        "meta",
+        "og:article:published",
+        "og:article:published_time",
+        "og:datepublished",
+        "og:pubdate",
+        "og:publish_date",
+        "og:published_time",
+        "og:question:published_time",
+        "og:regdate",
+        "originalpublicationdate",
+        "parsely-pub-date",
+        "pdate",
+        "ptime",
+        "pubdate",
+        "publishdate",
+        "publish_date",
+        "publish_time",
+        "publish-date",
+        "published-date",
+        "published_date",
+        "published_time",
+        "publisheddate",
+        "publication_date",
+        "rbpubdate",
+        "release_date",
+        "rnews:datepublished",
+        "sailthru.date",
+        "shareaholic:article_published_time",
+        "timestamp",
+        "twt-published-at",
+        "video:release_date",
+        "vr:published_time",
+    ]
+    .into_iter()
+    .collect()
+});
+
+/// Meta `property` attributes indicating modified/updated date.
+/// Port of `propertyModified` in go-htmldate.
+static PROPERTY_MODIFIED: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    [
+        "article:modified",
+        "article:modified_date",
+        "article:modified_time",
+        "article:post_modified",
+        "bt:moddate",
+        "datemodified",
+        "dc.modified",
+        "dcterms.modified",
+        "lastmodified",
+        "modified_time",
+        "modificationdate",
+        "og:article:modified_time",
+        "og:modified_time",
+        "og:updated_time",
+        "release_date",
+        "revision_date",
+        "updated_time",
+    ]
+    .into_iter()
+    .collect()
+});
+
+/// Meta `name` attributes indicating modification date.
+/// Port of `attrModifiedNames` in go-htmldate.
+static ATTR_MODIFIED_NAMES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    ["lastdate", "lastmod", "lastmodified", "last-modified", "modified", "utime"]
+        .into_iter()
+        .collect()
+});
+
+/// itemprop values for original publication date.
+static ITEM_PROP_ORIGINAL: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    ["datecreated", "datepublished", "pubyear"].into_iter().collect()
+});
+
+/// itemprop values for modified date.
+static ITEM_PROP_MODIFIED: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ["datemodified", "dateupdate"].into_iter().collect());
+
+/// Regex for extracting YYYY-MM-DD (with -, /, . separators) from a string.
+/// Port of rxYmdPattern in go-htmldate.
+static DATE_YMD_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?:^|\D)((?:199[0-9]|20[0-3][0-9]))[/\-.]([0-1]?[0-9])[/\-.]([0-3]?[0-9])(?:\D|$)",
+    )
+    .unwrap()
+});
+
+/// Regex for YYYYMMDD without separator.
+static DATE_NO_SEP_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?:\D|^)(\d{8})(?:\D|$)").unwrap());
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -156,8 +297,8 @@ pub fn extract_metadata(doc: &Document, opts: &Options) -> Metadata {
         }
     }
 
-    // Date extraction: we don't have an htmldate equivalent yet.
-    // metadata.date remains None.
+    // Date extraction (port of go-htmldate fast mode: UseOriginalDate=true, SkipExtensiveSearch=true).
+    metadata.date = extract_date(doc);
 
     // Sitename fallback via DOM.
     if metadata.sitename.is_empty() {
@@ -753,6 +894,290 @@ pub fn remove_blacklisted_authors(current: &str, opts: &Options) -> String {
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Date extraction (port of go-htmldate fast mode)
+// ---------------------------------------------------------------------------
+
+/// Top-level date extraction. Tries meta elements, then JSON-LD.
+///
+/// Mirrors go-htmldate's `findDate` in fast/UseOriginalDate=true mode.
+fn extract_date(doc: &Document) -> Option<chrono::NaiveDate> {
+    // 1. Meta elements (examineMetaElements equivalent)
+    if let Some(d) = examine_meta_date(doc) {
+        return Some(d);
+    }
+    // 2. JSON-LD (jsonSearch equivalent)
+    json_search_date(doc)
+}
+
+/// Scans `<meta>` elements for date cues.
+///
+/// Port of `examineMetaElements` from go-htmldate, UseOriginalDate=true.
+fn examine_meta_date(doc: &Document) -> Option<chrono::NaiveDate> {
+    let mut reserve: Option<chrono::NaiveDate> = None;
+
+    for node_id in doc.query_selector_all(doc.root(), "meta") {
+        let content = trim(&doc.get_attribute(node_id, "content").unwrap_or_default());
+        let datetime = trim(&doc.get_attribute(node_id, "datetime").unwrap_or_default());
+        if content.is_empty() && datetime.is_empty() {
+            continue;
+        }
+        let val = if !content.is_empty() { &content } else { &datetime };
+
+        let name = doc
+            .get_attribute(node_id, "name")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let property = doc
+            .get_attribute(node_id, "property")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let itemprop = doc
+            .get_attribute(node_id, "itemprop")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let pubdate = doc
+            .get_attribute(node_id, "pubdate")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let http_equiv = doc
+            .get_attribute(node_id, "http-equiv")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+
+        if !name.is_empty() && !content.is_empty() {
+            if DATE_ATTRIBUTES.contains(name.as_str()) {
+                // name in dateAttributes → always main date (UseOriginalDate=true)
+                if let Some(d) = fast_parse_date(val) {
+                    return Some(d);
+                }
+            } else if ATTR_MODIFIED_NAMES.contains(name.as_str()) {
+                // modified name → reserve for UseOriginalDate=true
+                if reserve.is_none() {
+                    reserve = fast_parse_date(val);
+                }
+            }
+        } else if !property.is_empty() && !content.is_empty() {
+            let in_date = DATE_ATTRIBUTES.contains(property.as_str());
+            let in_mod = PROPERTY_MODIFIED.contains(property.as_str());
+            if in_date {
+                // dateAttributes property → main date (UseOriginalDate=true)
+                if let Some(d) = fast_parse_date(val) {
+                    return Some(d);
+                }
+            } else if in_mod {
+                // modified property → reserve
+                if reserve.is_none() {
+                    reserve = fast_parse_date(val);
+                }
+            }
+        } else if !itemprop.is_empty() {
+            let attr_val = if !datetime.is_empty() { &datetime } else { &content };
+            if !attr_val.is_empty() {
+                if ITEM_PROP_ORIGINAL.contains(itemprop.as_str()) {
+                    // itemPropOriginal → main date (UseOriginalDate=true)
+                    if let Some(d) = fast_parse_date(attr_val) {
+                        return Some(d);
+                    }
+                } else if ITEM_PROP_MODIFIED.contains(itemprop.as_str()) {
+                    // itemPropModified → reserve for UseOriginalDate=true
+                    if reserve.is_none() {
+                        reserve = fast_parse_date(attr_val);
+                    }
+                }
+            }
+        } else if pubdate == "pubdate" && !content.is_empty() {
+            if let Some(d) = fast_parse_date(val) {
+                return Some(d);
+            }
+        } else if !http_equiv.is_empty() && !content.is_empty() {
+            if http_equiv == "date" {
+                // UseOriginalDate=true → main date
+                if let Some(d) = fast_parse_date(val) {
+                    return Some(d);
+                }
+            } else if http_equiv == "last-modified" {
+                // UseOriginalDate=true → reserve
+                if reserve.is_none() {
+                    reserve = fast_parse_date(val);
+                }
+            }
+        }
+    }
+
+    reserve
+}
+
+/// Scans JSON-LD `<script>` blocks for date fields.
+///
+/// Port of `jsonSearch` from go-htmldate, UseOriginalDate=true (picks earliest datePublished/dateCreated).
+fn json_search_date(doc: &Document) -> Option<chrono::NaiveDate> {
+    let sel = r#"script[type="application/ld+json"], script[type="application/settings+json"]"#;
+
+    // With UseOriginalDate=true we look for datePublished/dateCreated and pick the earliest.
+    let target_keys = ["datepublished", "datecreated"];
+
+    let mut best: Option<chrono::NaiveDate> = None;
+
+    for node_id in doc.query_selector_all(doc.root(), sel) {
+        let text = trim(&doc.text_content(node_id));
+        if text.is_empty() {
+            continue;
+        }
+
+        // Try to parse as array first, then object.
+        let obj_list: Vec<serde_json::Map<String, serde_json::Value>> =
+            if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&text) {
+                arr.into_iter()
+                    .filter_map(|v| {
+                        if let serde_json::Value::Object(m) = v {
+                            Some(m)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            } else if let Ok(serde_json::Value::Object(m)) = serde_json::from_str(&text) {
+                vec![m]
+            } else {
+                continue;
+            };
+
+        for obj in obj_list {
+            collect_json_dates(&obj, &target_keys, &mut |d| {
+                if best.is_none() || d < best.unwrap() {
+                    best = Some(d);
+                }
+            });
+        }
+    }
+
+    best
+}
+
+/// Recursively walks a JSON object collecting dates for the given keys.
+fn collect_json_dates(
+    obj: &serde_json::Map<String, serde_json::Value>,
+    target_keys: &[&str],
+    visitor: &mut impl FnMut(chrono::NaiveDate),
+) {
+    for (key, value) in obj {
+        let key_lower = key.to_lowercase();
+        match value {
+            serde_json::Value::String(s) => {
+                if target_keys.contains(&key_lower.as_str()) {
+                    if let Some(d) = fast_parse_date(s) {
+                        visitor(d);
+                    }
+                }
+            }
+            serde_json::Value::Object(nested) => {
+                collect_json_dates(nested, target_keys, visitor);
+            }
+            serde_json::Value::Array(arr) => {
+                for item in arr {
+                    if let serde_json::Value::Object(m) = item {
+                        collect_json_dates(m, target_keys, visitor);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Parses a date string, returning the date component if valid.
+///
+/// Port of `fastParse` from go-htmldate: tries ISO-8601, YYYYMMDD, and Y-M-D patterns.
+fn fast_parse_date(s: &str) -> Option<chrono::NaiveDate> {
+    use chrono::NaiveDate;
+
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+
+    // 1. Try RFC 3339 / ISO 8601 datetime (most common in meta attributes).
+    //    chrono's parse_from_rfc3339 handles "2020-01-20T09:49:32Z", "+05:30", etc.
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        let d = dt.date_naive();
+        if is_plausible_date(d) {
+            return Some(d);
+        }
+    }
+
+    // Also try without timezone offset (e.g. "2020-01-20T09:49:32").
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+        let d = dt.date();
+        if is_plausible_date(d) {
+            return Some(d);
+        }
+    }
+
+    // 2. Try plain YYYY-MM-DD.
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        if is_plausible_date(d) {
+            return Some(d);
+        }
+    }
+
+    // 3. Try YYYYMMDD without separator (first 8 chars all digits).
+    if s.len() >= 8 && s[..8].chars().all(|c| c.is_ascii_digit()) {
+        if let (Ok(y), Ok(m), Ok(d)) = (
+            s[..4].parse::<i32>(),
+            s[4..6].parse::<u32>(),
+            s[6..8].parse::<u32>(),
+        ) {
+            if let Some(date) = NaiveDate::from_ymd_opt(y, m, d) {
+                if is_plausible_date(date) {
+                    return Some(date);
+                }
+            }
+        }
+    }
+
+    // Also try YYYYMMDD via regex (for strings like "foo20200120bar").
+    if let Some(caps) = DATE_NO_SEP_RE.captures(s) {
+        let text = &caps[1];
+        if let (Ok(y), Ok(m), Ok(d)) = (
+            text[..4].parse::<i32>(),
+            text[4..6].parse::<u32>(),
+            text[6..8].parse::<u32>(),
+        ) {
+            if let Some(date) = NaiveDate::from_ymd_opt(y, m, d) {
+                if is_plausible_date(date) {
+                    return Some(date);
+                }
+            }
+        }
+    }
+
+    // 4. Try YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD via regex.
+    if let Some(caps) = DATE_YMD_RE.captures(s) {
+        if let (Ok(y), Ok(m), Ok(d)) = (
+            caps[1].parse::<i32>(),
+            caps[2].parse::<u32>(),
+            caps[3].parse::<u32>(),
+        ) {
+            if let Some(date) = NaiveDate::from_ymd_opt(y, m, d) {
+                if is_plausible_date(date) {
+                    return Some(date);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Returns true if the date is within the plausible range (1995 – now+1 year).
+/// Port of `validateDate` in go-htmldate.
+fn is_plausible_date(d: chrono::NaiveDate) -> bool {
+    let year = d.year();
+    let now_year = chrono::Local::now().year();
+    year >= 1995 && year <= now_year + 1
+}
 
 /// Simple Unicode-aware title case.
 ///

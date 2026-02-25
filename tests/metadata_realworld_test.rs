@@ -217,8 +217,7 @@ fn test_metadata_real_pages() {
     let m = get_metadata(url);
     assert!(m.title.ends_with("scores historic upset at SAG awards, boosting Oscar chances"));
     assert_eq!(m.author, "Jill Serjeant");
-    // Go asserts date == "2020-01-20" but our dateparser doesn't extract it from this page.
-    // assert_eq!(m.date.map(|d| d.format("%Y-%m-%d").to_string()).as_deref(), Some("2020-01-20"));
+    assert_eq!(m.date.map(|d| d.format("%Y-%m-%d").to_string()).as_deref(), Some("2020-01-20"));
     assert!(m.tags.contains(&"Film".to_string()));
     assert!(m.tags.contains(&"South Korea".to_string()));
     assert_eq!(m.url, "https://www.reuters.com/article/us-awards-sag-idUSKBN1ZI0EH");
