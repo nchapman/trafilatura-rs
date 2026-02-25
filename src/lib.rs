@@ -90,10 +90,9 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
         }
     }
 
-    // Clone the document for fallback strategies before any destructive cleaning.
-    // Clones are deferred behind option checks to avoid unnecessary O(N) copies.
-    let doc_backup1 = if opts.enable_fallback { Some(doc.clone_document()) } else { None };
-    let doc_backup2 = if opts.focus != ExtractionFocus::FavorPrecision { Some(doc.clone_document()) } else { None };
+    // Clone the document before destructive cleaning for fallback strategies.
+    let doc_backup1 = doc.clone_document();
+    let mut doc_backup2 = doc.clone_document();
 
     // Clean and normalise tags on the main work document.
     doc_cleaning(&mut doc, &opts);
@@ -104,8 +103,7 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
         extract_comments(&mut doc, &mut cache, &opts)
     } else {
         if opts.focus == ExtractionFocus::FavorPrecision {
-            let cleaned = prune_unwanted_nodes(&doc, selector::discard::REMOVED_COMMENTS, false);
-            doc = cleaned;
+            doc = prune_unwanted_nodes(&doc, selector::discard::REMOVED_COMMENTS, false);
         }
         (None, String::new())
     };
@@ -115,17 +113,15 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
     let (mut content_doc, mut tmp_body_text) = extract_content(&doc, &mut cache, &opts);
 
     // External fallback comparison (readability / domdistiller).
-    if let Some(ref backup1) = doc_backup1 {
+    if opts.enable_fallback {
         (content_doc, tmp_body_text) =
-            compare_external_extraction(backup1, content_doc, &opts);
+            compare_external_extraction(&doc_backup1, content_doc, &opts);
     }
 
     // Rescue with baseline if text is still too short and we are not in precision mode.
     let len_text = tmp_body_text.chars().count();
-    if len_text < opts.config.min_extracted_size {
-        if let Some(mut backup) = doc_backup2 {
-            (content_doc, tmp_body_text) = baseline(&mut backup);
-        }
+    if len_text < opts.config.min_extracted_size && opts.focus != ExtractionFocus::FavorPrecision {
+        (content_doc, tmp_body_text) = baseline(&mut doc_backup2);
     }
 
     // Tree size sanity check.

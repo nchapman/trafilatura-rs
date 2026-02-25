@@ -24,6 +24,8 @@ use html_processing::{
 // ---------------------------------------------------------------------------
 
 /// Rule-based deletion of targeted document sections.
+/// Takes ownership of `doc`; callers that need to retain the original must
+/// pass `doc.clone_document()`.
 ///
 /// Port of `pruneUnwantedSections`.
 pub fn prune_unwanted_sections(
@@ -123,7 +125,6 @@ fn recover_wild_text(
         }
     }
 
-    // Prune the backup doc.
     let mut search_doc = prune_unwanted_sections(doc, potential_tags, opts);
 
     let root = search_doc.root();
@@ -191,11 +192,9 @@ pub fn extract_content(
         // prunes only the subtree, not the full document.  Pruning the full document
         // incorrectly applies link-density tests across unrelated page sections, which
         // can remove the very element we just selected.
-        let subtree_inner = doc.inner_html(sub_id);
-        let subtree_html = format!("<html><body>{subtree_inner}</body></html>");
-        let subtree_doc = Document::parse(&subtree_html);
+        // Uses direct node copying rather than serialize+reparse to avoid html5ever overhead.
+        let subtree_doc = doc.extract_subtree_as_document(sub_id);
 
-        // Prune unwanted content within the subtree.
         let mut work = prune_unwanted_sections(&subtree_doc, &potential_tags, opts);
         let work_body = work.body().unwrap_or_else(|| work.root());
 
@@ -434,6 +433,48 @@ mod tests {
         let pruned = prune_unwanted_sections(&doc, &potential_tags, &default_opts());
         let text = pruned.iter_text(pruned.root(), " ");
         assert!(text.contains("Short article"), "content lost: {text}");
+    }
+
+    #[test]
+    fn test_prune_unwanted_sections_ownership_chain_no_panic() {
+        // prune_unwanted_sections chains four prune_unwanted_nodes calls via ownership.
+        // Verify it completes without panic and returns a usable document.
+        let html = r#"<html><body>
+            <div class="sidebar">sidebar text</div>
+            <div class="footer">footer text</div>
+            <p>main content here that should survive</p>
+        </body></html>"#;
+        let doc = Document::parse(html);
+        let potential_tags: HashSet<&str> = HashSet::new();
+        let result = prune_unwanted_sections(&doc, &potential_tags, &default_opts());
+        assert!(
+            result.query_selector(result.root(), "p").is_some(),
+            "main paragraph must survive"
+        );
+    }
+
+    #[test]
+    fn test_prune_unwanted_sections_include_images_false_removes_caption() {
+        // When include_images=false, DISCARDED_IMAGE rules run.
+        // DISCARDED_IMAGE targets caption containers (class="caption"), not bare <figure>.
+        let html = r#"<html><body>
+            <div class="caption">Image caption text</div>
+            <p>article text here is long enough to pass the threshold</p>
+        </body></html>"#;
+        let doc = Document::parse(html);
+        let potential_tags: HashSet<&str> = HashSet::new();
+        let opts = Options { include_images: false, ..Options::default() };
+        let result = prune_unwanted_sections(&doc, &potential_tags, &opts);
+        // Caption div should be pruned.
+        assert!(
+            result.query_selector(result.root(), "div").is_none(),
+            "caption container must be pruned when include_images=false"
+        );
+        // Paragraph should survive.
+        assert!(
+            result.query_selector(result.root(), "p").is_some(),
+            "article paragraph must survive"
+        );
     }
 
     // ---------------------------------------------------------------------------

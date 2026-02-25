@@ -106,51 +106,51 @@ pub fn prune_html(doc: &mut Document, opts: &Options) {
 
 /// Prunes the HTML tree by removing elements matched by any selector rule.
 /// Optionally restores the original tree if too much text would be lost.
-/// Always works on a clone of the input; the original is never mutated.
+/// Always returns an owned clone of the (potentially pruned) document.
 ///
 /// Port of `pruneUnwantedNodes`.
 pub fn prune_unwanted_nodes(doc: &Document, rules: &[Rule], with_backup: bool) -> Document {
-    let mut cloned = doc.clone_document();
-
     let (backup, old_len) = if with_backup {
-        let text_len = cloned.iter_text(cloned.root(), " ").chars().count();
-        (Some(cloned.clone_document()), text_len)
+        let text_len = doc.iter_text(doc.root(), " ").chars().count();
+        (Some(doc.clone_document()), text_len)
     } else {
         (None, 0)
     };
 
+    let mut work = doc.clone_document();
+
     // Collect all matches upfront, then remove in reverse order.
-    let root = cloned.root();
-    let matches = query_all(&cloned, root, rules);
+    let root = work.root();
+    let matches = query_all(&work, root, rules);
     for &id in matches.iter().rev() {
         // Preserve tail text before removing.
         // Go always uses SetTail on the previous sibling (if any) or on the parent:
         //   previous = subElement.PrevSibling or subElement.Parent
         //   etree.SetTail(previous, previousTail + " " + tail)
-        let tail = cloned.tail(id);
+        let tail = work.tail(id);
         if !tail.is_empty() {
-            let target = cloned.prev_element_sibling(id).or_else(|| cloned.parent(id));
+            let target = work.prev_element_sibling(id).or_else(|| work.parent(id));
             if let Some(target_id) = target {
-                let prev_tail = cloned.tail(target_id);
+                let prev_tail = work.tail(target_id);
                 let new_tail = if prev_tail.is_empty() {
                     tail
                 } else {
                     format!("{prev_tail} {tail}")
                 };
-                cloned.set_tail(target_id, &new_tail);
+                work.set_tail(target_id, &new_tail);
             }
         }
-        cloned.remove(id, false);
+        work.remove(id, false);
     }
 
     if with_backup {
-        let new_len = cloned.iter_text(cloned.root(), " ").chars().count();
+        let new_len = work.iter_text(work.root(), " ").chars().count();
         if new_len <= old_len / 7 {
             return backup.unwrap();
         }
     }
 
-    cloned
+    work
 }
 
 /// Converts, formats, and probes potential text elements.
@@ -767,4 +767,81 @@ mod tests {
         // Comments should be gone; paragraph should remain.
         assert!(doc.query_selector(doc.root(), "p").is_some());
     }
+
+    // -----------------------------------------------------------------------
+    // prune_unwanted_nodes: backup/restore threshold behavior
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_prune_no_backup_removes_all_matching_even_if_drastic() {
+        use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
+        // with_backup=false: even if 100% of text is removed, no restore happens.
+        let doc = parse(r#"<html><body><div class="footer">all the text lives here</div></body></html>"#);
+        let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, false);
+        // Footer is gone and no restore occurred — body is empty.
+        assert!(result.query_selector(result.root(), "div").is_none());
+    }
+
+    #[test]
+    fn test_prune_backup_not_restored_when_removal_is_small() {
+        use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
+        // Most text is NOT in the footer: after pruning, more than 1/7 of original
+        // text remains, so the backup must NOT be restored.
+        let doc = parse(r#"<html><body>
+            <p>This is a long article body with plenty of text content here.</p>
+            <p>Another paragraph with substantial content to ensure we stay well above the threshold.</p>
+            <div class="footer">footer</div>
+        </body></html>"#);
+        let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
+        // Footer removed, paragraphs remain — backup was NOT restored.
+        assert!(result.query_selector(result.root(), "div").is_none(), "footer must be pruned");
+        assert!(result.query_selector(result.root(), "p").is_some(), "paragraphs must survive");
+    }
+
+    #[test]
+    fn test_prune_backup_restored_preserves_original_structure() {
+        use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
+        // ALL meaningful text is in a "nav" div — removing it drops everything,
+        // triggering restore. The restored document must be structurally identical
+        // to the input (same elements present).
+        let doc = parse(r#"<html><body>
+            <div class="nav">nav text one two three four five six seven eight nine ten eleven</div>
+        </body></html>"#);
+        let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
+        // Because more than 6/7 of the text was removed, restore should have happened.
+        // The nav div should be back.
+        assert!(
+            result.query_selector(result.root(), "div").is_some(),
+            "document must be restored when too much text would be lost"
+        );
+    }
+
+    #[test]
+    fn test_prune_backup_captures_pre_modification_state() {
+        use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
+        // Verify that the backup reflects the document BEFORE any pruning.
+        // Strategy: if backup were captured after partial modification, the restored
+        // document would be missing some elements. We check that ALL original
+        // elements are present after restore.
+        let doc = parse(r#"<html><body>
+            <div class="nav">nav-only-content one two three four five six seven</div>
+            <div class="footer">footer-only-content</div>
+        </body></html>"#);
+        let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
+        let body = result.body().unwrap();
+        let divs = result.get_elements_by_tag_name(body, "div");
+        // Both divs should be restored (backup was taken before ANY removal).
+        assert_eq!(divs.len(), 2, "backup must contain both divs from original document");
+    }
+
+    #[test]
+    fn test_prune_unwanted_nodes_empty_document() {
+        use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
+        // Empty doc must not panic with either backup setting.
+        let doc_no_backup = parse("<html><body></body></html>");
+        let _ = prune_unwanted_nodes(&doc_no_backup, OVERALL_DISCARDED_CONTENT, false);
+        let doc_with_backup = parse("<html><body></body></html>");
+        let _ = prune_unwanted_nodes(&doc_with_backup, OVERALL_DISCARDED_CONTENT, true);
+    }
+
 }

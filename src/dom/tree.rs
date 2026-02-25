@@ -561,6 +561,21 @@ impl Document {
     pub fn clone_document(&self) -> Document {
         Document { tree: self.tree.clone() }
     }
+
+    /// Extracts the children of `id` into a fresh `<html><body>` document.
+    ///
+    /// Cheaper than `inner_html` + `Document::parse` because it copies nodes
+    /// directly without going through HTML serialization and re-parsing.
+    pub fn extract_subtree_as_document(&self, id: NodeId) -> Document {
+        let mut new_doc = Document::parse("<html><body></body></html>");
+        let body = new_doc.body().unwrap();
+        let children: Vec<NodeId> = self.tree.get(id).unwrap()
+            .children().map(|c| c.id()).collect();
+        for child_id in children {
+            new_doc.clone_from_tree(&self.tree, child_id, body);
+        }
+        new_doc
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -972,5 +987,311 @@ mod tests {
         assert_eq!(d.next_element_sibling(p), Some(span));
         assert_eq!(d.prev_element_sibling(span), Some(p));
         assert_eq!(d.parent(p), Some(div));
+    }
+
+    // -----------------------------------------------------------------------
+    // strip_tags: multi-tag and nesting edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_strip_tags_multi_tag_parent_and_child() {
+        // Both <div> and <p> are in the strip set.
+        // After stripping both, text content must survive and no elements remain.
+        let mut d = doc("<div><p>text</p></div>");
+        let body = d.body().unwrap();
+        d.strip_tags(body, &["div", "p"]);
+        let text = d.text_content(body);
+        assert!(text.contains("text"), "text content must survive");
+        assert!(d.children(body).is_empty(), "no element children should remain");
+    }
+
+    #[test]
+    fn test_strip_tags_deeply_nested_same_tag() {
+        // Three nested <div>s with the same tag — all stripped, innermost text survives.
+        let mut d = doc("<div><div><div>deep</div></div></div>");
+        let body = d.body().unwrap();
+        d.strip_tags(body, &["div"]);
+        assert!(d.text_content(body).contains("deep"));
+        assert!(d.children(body).is_empty());
+    }
+
+    #[test]
+    fn test_strip_tags_order_independent() {
+        // strip_tags(["b","i"]) and strip_tags(["i","b"]) must produce the same text.
+        let html = "<p>a<b>bold</b>b<i>italic</i>c</p>";
+
+        let mut d1 = doc(html);
+        let body1 = d1.body().unwrap();
+        let p1 = d1.children(body1)[0];
+        d1.strip_tags(p1, &["b", "i"]);
+
+        let mut d2 = doc(html);
+        let body2 = d2.body().unwrap();
+        let p2 = d2.children(body2)[0];
+        d2.strip_tags(p2, &["i", "b"]);
+
+        assert_eq!(d1.text_content(p1), d2.text_content(p2));
+        assert!(d1.text_content(p1).contains("bold"));
+        assert!(d1.text_content(p1).contains("italic"));
+    }
+
+    #[test]
+    fn test_strip_tags_preserves_tail_text() {
+        // Text after each inline element (tail) must be preserved when tag is stripped.
+        let mut d = doc("<p>before<b>bold</b>mid<i>italic</i>end</p>");
+        let body = d.body().unwrap();
+        let p = d.children(body)[0];
+        d.strip_tags(p, &["b", "i"]);
+        let text = d.text_content(p);
+        assert!(text.contains("before"));
+        assert!(text.contains("bold"));
+        assert!(text.contains("mid"));
+        assert!(text.contains("italic"));
+        assert!(text.contains("end"));
+    }
+
+    #[test]
+    fn test_strip_tags_does_not_affect_unspecified_tags() {
+        // Only listed tags are stripped; others survive unchanged.
+        let mut d = doc("<div><b>bold</b><em>em</em></div>");
+        let body = d.body().unwrap();
+        let div = d.children(body)[0];
+        d.strip_tags(div, &["b"]);
+        // <em> must still exist; <b> must be gone.
+        assert!(d.children(div).iter().any(|&c| d.tag_name(c) == "em"));
+        assert!(!d.children(div).iter().any(|&c| d.tag_name(c) == "b"));
+        assert!(d.text_content(div).contains("bold"));
+    }
+
+    // -----------------------------------------------------------------------
+    // strip_elements: multi-tag and nesting edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_strip_elements_nested_both_match_no_panic() {
+        // Parent and child both match the rule set.
+        // The new multi-tag path processes children before parents (reverse doc order).
+        // This must not panic and must remove both.
+        let mut d = doc("<div><div><p>gone</p></div></div>");
+        let body = d.body().unwrap();
+        d.strip_elements(body, false, &["div", "p"]);
+        assert!(d.children(body).is_empty(), "all matching elements must be removed");
+        assert!(!d.text_content(body).contains("gone"), "removed elements' text must be gone");
+    }
+
+    #[test]
+    fn test_strip_elements_deeply_nested_all_same_tag() {
+        // Three levels of <script> nesting — all removed, no panic.
+        let mut d = doc("<div><script><script>inner</script>outer</script></div>");
+        let body = d.body().unwrap();
+        let div = d.children(body)[0];
+        d.strip_elements(div, false, &["script"]);
+        assert!(
+            d.get_elements_by_tag_name(div, "script").is_empty(),
+            "all script elements must be removed"
+        );
+    }
+
+    #[test]
+    fn test_strip_elements_keeps_non_matching_sibling() {
+        // A sibling that does not match must survive.
+        let mut d = doc("<div><p>keep</p><script>remove</script></div>");
+        let body = d.body().unwrap();
+        let div = d.children(body)[0];
+        d.strip_elements(div, false, &["script"]);
+        let children = d.children(div);
+        assert_eq!(children.len(), 1);
+        assert_eq!(d.tag_name(children[0]), "p");
+        assert!(d.text_content(div).contains("keep"));
+    }
+
+    #[test]
+    fn test_strip_elements_keep_tail_true() {
+        // With keep_tail=true, text after the removed element survives.
+        let mut d = doc("<div><script>rm</script>tail-text<p>para</p></div>");
+        let body = d.body().unwrap();
+        let div = d.children(body)[0];
+        d.strip_elements(div, true, &["script"]);
+        let text = d.text_content(div);
+        assert!(!text.contains("rm"), "script content must be gone");
+        assert!(text.contains("tail-text"), "tail text must survive when keep_tail=true");
+    }
+
+    #[test]
+    fn test_strip_elements_keep_tail_false_discards_tail() {
+        // With keep_tail=false, text after the removed element is also dropped.
+        let mut d = doc("<div><script>rm</script>tail-text<p>para</p></div>");
+        let body = d.body().unwrap();
+        let div = d.children(body)[0];
+        d.strip_elements(div, false, &["script"]);
+        let text = d.text_content(div);
+        assert!(!text.contains("rm"), "script content must be gone");
+        assert!(!text.contains("tail-text"), "tail text must be discarded when keep_tail=false");
+    }
+
+    #[test]
+    fn test_strip_elements_single_vs_multi_tag_same_result() {
+        // The single-tag fast path and the multi-tag HashSet path must produce
+        // identical results when called with one tag vs the same tag in a two-element slice.
+        let html = r#"<div><p>keep</p><script>rm1</script><style>rm2</style></div>"#;
+
+        // Single call with two tags (uses multi-tag path).
+        let mut d_multi = doc(html);
+        let body_m = d_multi.body().unwrap();
+        let div_m = d_multi.children(body_m)[0];
+        d_multi.strip_elements(div_m, false, &["script", "style"]);
+
+        // Two calls each with one tag (uses single-tag fast path twice).
+        let mut d_single = doc(html);
+        let body_s = d_single.body().unwrap();
+        let div_s = d_single.children(body_s)[0];
+        d_single.strip_elements(div_s, false, &["script"]);
+        d_single.strip_elements(div_s, false, &["style"]);
+
+        assert_eq!(d_multi.text_content(div_m), d_single.text_content(div_s));
+        assert_eq!(
+            d_multi.children(div_m).len(),
+            d_single.children(div_s).len()
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_subtree_as_document
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_extract_subtree_basic_elements() {
+        let d = doc("<article><p>hello</p><p>world</p></article>");
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+        let paras = sub.get_elements_by_tag_name(sub_body, "p");
+        assert_eq!(paras.len(), 2);
+        assert!(sub.text_content(sub_body).contains("hello"));
+        assert!(sub.text_content(sub_body).contains("world"));
+    }
+
+    #[test]
+    fn test_extract_subtree_preserves_attributes() {
+        let d = doc(r#"<article><p class="lead" id="p1">text</p></article>"#);
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+        let p = sub.query_selector(sub_body, "p").unwrap();
+        assert_eq!(sub.class_name(p), "lead");
+        assert_eq!(sub.id_attr(p), "p1");
+    }
+
+    #[test]
+    fn test_extract_subtree_preserves_comment_nodes() {
+        // Comment nodes inside the subtree must be copied into the new document.
+        let d = doc("<article><!-- note --><p>text</p></article>");
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+        // Comment should be present among body's children.
+        let has_comment = sub.tree.get(sub_body).unwrap()
+            .children()
+            .any(|c| matches!(c.value(), Node::Comment(_)));
+        assert!(has_comment, "comment node must be copied into the subtree document");
+    }
+
+    #[test]
+    fn test_extract_subtree_preserves_tail_text() {
+        // Tail text (text nodes after a closing tag but before the next element)
+        // must survive the copy.
+        let d = doc("<article><p>para</p>tail text<span>span</span></article>");
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+        assert!(
+            sub.text_content(sub_body).contains("tail text"),
+            "tail text between elements must be preserved"
+        );
+    }
+
+    #[test]
+    fn test_extract_subtree_deeply_nested() {
+        let d = doc("<section><div><ul><li>item1</li><li>item2</li></ul></div></section>");
+        let body = d.body().unwrap();
+        let section = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(section);
+        let sub_body = sub.body().unwrap();
+        let items = sub.get_elements_by_tag_name(sub_body, "li");
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn test_extract_subtree_independent_of_original() {
+        // Mutating the extracted document must not affect the source.
+        let d = doc("<article><p>original</p></article>");
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let mut sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+        let p_in_sub = sub.query_selector(sub_body, "p").unwrap();
+        sub.set_text(p_in_sub, "changed");
+        // Original document should be untouched.
+        assert!(d.text_content(article).contains("original"));
+    }
+
+    #[test]
+    fn test_extract_subtree_original_unmodified_after_extraction() {
+        // Extraction must not modify the source document.
+        let d = doc("<article><p>keep</p></article>");
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let _sub = d.extract_subtree_as_document(article);
+        // Source document fully intact.
+        assert!(d.query_selector(article, "p").is_some());
+        assert!(d.text_content(article).contains("keep"));
+    }
+
+    #[test]
+    fn test_extract_subtree_table_structure_preserved() {
+        // html5ever inserts implicit <tbody>; direct copy must preserve it.
+        let d = doc("<section><table><tr><td>cell</td></tr></table></section>");
+        let body = d.body().unwrap();
+        let section = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(section);
+        let sub_body = sub.body().unwrap();
+        // <td> must still be reachable.
+        assert!(sub.query_selector(sub_body, "td").is_some());
+        assert!(sub.text_content(sub_body).contains("cell"));
+    }
+
+    #[test]
+    fn test_extract_subtree_empty_element() {
+        // An element with no children should produce an empty body.
+        let d = doc("<article></article>");
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+        let sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+        assert!(sub.children(sub_body).is_empty());
+        assert!(sub.text_content(sub_body).is_empty());
+    }
+
+    #[test]
+    fn test_extract_subtree_matches_inner_html_content() {
+        // The text content of the extracted sub-document must equal the text
+        // content of the original subtree — same as what inner_html+reparse produced.
+        let html = "<article><h1>Title</h1><p>Para <b>bold</b> text.</p></article>";
+        let d = doc(html);
+        let body = d.body().unwrap();
+        let article = d.children(body)[0];
+
+        let sub = d.extract_subtree_as_document(article);
+        let sub_body = sub.body().unwrap();
+
+        assert_eq!(
+            sub.text_content(sub_body),
+            d.text_content(article),
+            "text content of extracted subtree must match original"
+        );
     }
 }
