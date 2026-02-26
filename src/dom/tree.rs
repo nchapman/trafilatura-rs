@@ -230,17 +230,17 @@ impl Document {
                 .collect()
         };
         for tid in to_remove {
-            self.tree.get_mut(tid).unwrap().detach();
+            self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
         }
 
         // Insert new text node at the front.
         if !text.is_empty() {
             let new_node_val = make_text(text);
-            let first_child = self.tree.get(id).unwrap().children().next().map(|c| c.id());
+            let first_child = self.tree.get(id).expect("callers hold valid NodeIds from this tree").children().next().map(|c| c.id());
             if let Some(first_id) = first_child {
-                self.tree.get_mut(first_id).unwrap().insert_before(new_node_val);
+                self.tree.get_mut(first_id).expect("child NodeId from same tree").insert_before(new_node_val);
             } else {
-                self.tree.get_mut(id).unwrap().append(new_node_val);
+                self.tree.get_mut(id).expect("callers hold valid NodeIds from this tree").append(new_node_val);
             }
         }
     }
@@ -291,18 +291,18 @@ impl Document {
         // Remove existing tail text nodes.
         let old_tails = self.tail_nodes(id);
         for tid in old_tails {
-            self.tree.get_mut(tid).unwrap().detach();
+            self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
         }
 
         if tail.is_empty() { return; }
 
         // Insert new tail node.
         let new_tail = make_text(tail);
-        let next_sib = self.tree.get(id).unwrap().next_sibling().map(|n| n.id());
+        let next_sib = self.tree.get(id).expect("id validated by parent check above").next_sibling().map(|n| n.id());
         if let Some(next_id) = next_sib {
-            self.tree.get_mut(next_id).unwrap().insert_before(new_tail);
+            self.tree.get_mut(next_id).expect("sibling NodeId from same tree").insert_before(new_tail);
         } else {
-            self.tree.get_mut(parent_id).unwrap().append(new_tail);
+            self.tree.get_mut(parent_id).expect("parent_id validated above").append(new_tail);
         }
     }
 }
@@ -326,7 +326,7 @@ impl Document {
     ///
     /// Port of `etree.SubElement`.
     pub fn sub_element(&mut self, parent: NodeId, tag: &str) -> NodeId {
-        self.tree.get_mut(parent).unwrap().append(make_element(tag)).id()
+        self.tree.get_mut(parent).expect("parent NodeId must be valid").append(make_element(tag)).id()
     }
 
     /// Appends `child` (and its tail text nodes) to `parent` by cloning.
@@ -351,14 +351,14 @@ impl Document {
 
         // Append cloned tail text nodes.
         for text in &tail_texts {
-            self.tree.get_mut(parent).unwrap().append(make_text(text));
+            self.tree.get_mut(parent).expect("parent NodeId must be valid").append(make_text(text));
         }
 
         // Detach original tail nodes and original child.
         for tid in old_tail_ids {
-            self.tree.get_mut(tid).unwrap().detach();
+            self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
         }
-        self.tree.get_mut(child).unwrap().detach();
+        self.tree.get_mut(child).expect("child NodeId must be valid").detach();
     }
 
     /// Appends multiple children into `parent`.
@@ -386,10 +386,10 @@ impl Document {
         if !keep_tail {
             let tails = self.tail_nodes(id);
             for tid in tails {
-                self.tree.get_mut(tid).unwrap().detach();
+                self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
             }
         }
-        self.tree.get_mut(id).unwrap().detach();
+        self.tree.get_mut(id).expect("id validated at top of remove()").detach();
     }
 
     /// Removes an element but preserves its children (merged into parent) and
@@ -397,23 +397,22 @@ impl Document {
     ///
     /// Port of `etree.Strip`.
     pub fn strip(&mut self, id: NodeId) {
-        if self.parent(id).is_none() { return; }
+        let Some(parent) = self.parent(id) else { return };
 
         let child_ids: Vec<NodeId> = self.child_nodes(id);
-        let next_sib = self.tree.get(id).unwrap().next_sibling().map(|n| n.id());
+        let next_sib = self.tree.get(id).expect("id validated by parent check").next_sibling().map(|n| n.id());
 
         // Clone each child and insert before `id`'s position.
         for child_id in child_ids {
             if let Some(ns_id) = next_sib {
                 self.clone_subtree_before(child_id, ns_id);
             } else {
-                let parent = self.parent(id).unwrap();
                 self.clone_subtree_into(child_id, parent);
             }
         }
 
         // Detach the stripped element (leave tail nodes in place).
-        self.tree.get_mut(id).unwrap().detach();
+        self.tree.get_mut(id).expect("id validated by parent check").detach();
     }
 
     /// Removes elements with any of the given tags but keeps their text/children.
@@ -472,7 +471,7 @@ impl Document {
     pub fn remove_comment(&mut self, id: NodeId) {
         if let Some(node) = self.tree.get(id) {
             if matches!(node.value(), Node::Comment(_)) {
-                self.tree.get_mut(id).unwrap().detach();
+                self.tree.get_mut(id).expect("id validated by get() above").detach();
             }
         }
     }
@@ -514,10 +513,10 @@ impl Document {
 impl Document {
     /// Deep-clone `source` into `target_parent` as a new last child.
     pub(crate) fn clone_subtree_into(&mut self, source: NodeId, target_parent: NodeId) -> NodeId {
-        let val = self.tree.get(source).unwrap().value().clone();
-        let new_id = self.tree.get_mut(target_parent).unwrap().append(val).id();
+        let val = self.tree.get(source).expect("source NodeId must be valid").value().clone();
+        let new_id = self.tree.get_mut(target_parent).expect("target_parent NodeId must be valid").append(val).id();
 
-        let children: Vec<NodeId> = self.tree.get(source).unwrap()
+        let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
             .children().map(|c| c.id()).collect();
         for child_id in children {
             self.clone_subtree_into(child_id, new_id);
@@ -527,10 +526,10 @@ impl Document {
 
     /// Deep-clone `source` and insert it immediately before `target_sibling`.
     pub(crate) fn clone_subtree_before(&mut self, source: NodeId, target_sibling: NodeId) -> NodeId {
-        let val = self.tree.get(source).unwrap().value().clone();
-        let new_id = self.tree.get_mut(target_sibling).unwrap().insert_before(val).id();
+        let val = self.tree.get(source).expect("source NodeId must be valid").value().clone();
+        let new_id = self.tree.get_mut(target_sibling).expect("target_sibling NodeId must be valid").insert_before(val).id();
 
-        let children: Vec<NodeId> = self.tree.get(source).unwrap()
+        let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
             .children().map(|c| c.id()).collect();
         for child_id in children {
             self.clone_subtree_into(child_id, new_id);
@@ -545,10 +544,10 @@ impl Document {
         source_id: NodeId,
         target_parent: NodeId,
     ) -> NodeId {
-        let val = source_tree.get(source_id).unwrap().value().clone();
-        let new_id = self.tree.get_mut(target_parent).unwrap().append(val).id();
+        let val = source_tree.get(source_id).expect("source_id must be valid in source tree").value().clone();
+        let new_id = self.tree.get_mut(target_parent).expect("target_parent NodeId must be valid").append(val).id();
 
-        let children: Vec<NodeId> = source_tree.get(source_id).unwrap()
+        let children: Vec<NodeId> = source_tree.get(source_id).expect("source_id must be valid in source tree")
             .children().map(|c| c.id()).collect();
         for child_id in children {
             self.clone_from_tree(source_tree, child_id, new_id);
@@ -569,8 +568,8 @@ impl Document {
     /// directly without going through HTML serialization and re-parsing.
     pub fn extract_subtree_as_document(&self, id: NodeId) -> Document {
         let mut new_doc = Document::parse("<html><body></body></html>");
-        let body = new_doc.body().unwrap();
-        let children: Vec<NodeId> = self.tree.get(id).unwrap()
+        let body = new_doc.body().expect("freshly parsed document has body");
+        let children: Vec<NodeId> = self.tree.get(id).expect("id must be valid in source document")
             .children().map(|c| c.id()).collect();
         for child_id in children {
             new_doc.clone_from_tree(&self.tree, child_id, body);

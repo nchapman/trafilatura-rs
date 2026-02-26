@@ -1077,7 +1077,7 @@ fn json_search_date(doc: &Document) -> Option<chrono::NaiveDate> {
 
         for obj in obj_list {
             collect_json_dates(&obj, &target_keys, &mut |d| {
-                if best.is_none() || d < best.unwrap() {
+                if best.map_or(true, |b| d < b) {
                     best = Some(d);
                 }
             });

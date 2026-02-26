@@ -24,7 +24,10 @@ fn parse_http_url(s: &str) -> Option<Url> {
 ///
 /// Port of `createAbsoluteURL`.
 pub fn create_absolute_url(url_str: &str, base: Option<&Url>) -> String {
-    if url_str.is_empty() || base.is_none() {
+    let Some(base) = base else {
+        return url_str.to_string();
+    };
+    if url_str.is_empty() {
         return url_str.to_string();
     }
 
@@ -41,7 +44,6 @@ pub fn create_absolute_url(url_str: &str, base: Option<&Url>) -> String {
     }
 
     // Resolve against base.
-    let base = base.unwrap();
     match base.join(url_str) {
         Ok(resolved) => resolved.to_string(),
         Err(_) => url_str.to_string(),

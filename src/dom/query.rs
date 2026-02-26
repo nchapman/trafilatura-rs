@@ -100,7 +100,7 @@ impl Document {
         // Remove all existing children.
         let children: Vec<NodeId> = self.child_nodes(id);
         for child_id in children {
-            self.tree.get_mut(child_id).unwrap().detach();
+            self.tree.get_mut(child_id).expect("child NodeId from same tree").detach();
         }
 
         // Parse fragment as a full document and transfer body children.

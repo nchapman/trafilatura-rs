@@ -146,7 +146,7 @@ pub fn prune_unwanted_nodes(doc: &Document, rules: &[Rule], with_backup: bool) -
     if with_backup {
         let new_len = work.iter_text(work.root(), " ").chars().count();
         if new_len <= old_len / 7 {
-            return backup.unwrap();
+            return backup.expect("backup set when with_backup is true");
         }
     }
 

@@ -1,5 +1,41 @@
 // Port of go-trafilatura/core.go
 
+//! Web content extraction library.
+//!
+//! `trafilatura` extracts the main text, comments, and metadata from web pages,
+//! stripping boilerplate (navigation, ads, footers) while preserving the
+//! article body. It is a faithful Rust port of
+//! [go-trafilatura](https://github.com/markusmobius/go-trafilatura).
+//!
+//! # Quick start
+//!
+//! ```rust
+//! use trafilatura::{extract, Options};
+//!
+//! let html = r#"<html><body>
+//!   <nav>Menu items</nav>
+//!   <article><p>This is the main article content.</p></article>
+//!   <footer>Copyright 2024</footer>
+//! </body></html>"#;
+//!
+//! let result = extract(html, Options::default()).unwrap();
+//! assert!(result.content_text.contains("main article content"));
+//! ```
+//!
+//! # Features
+//!
+//! - **Content extraction** — identifies and extracts the main body text using
+//!   CSS selector rules, paragraph scoring, and heuristic filters.
+//! - **Comment extraction** — separately extracts user comments (optional).
+//! - **Metadata** — extracts title, author, date, description, categories, tags,
+//!   license, and more from meta tags, OpenGraph, and JSON-LD.
+//! - **Fallback strategies** — when primary extraction yields too little content,
+//!   falls back to readability-based or baseline extraction.
+//! - **Language filtering** — optionally reject documents that don't match a
+//!   target language (detected via `whatlang`).
+//! - **Deduplication** — LRU-based detection of duplicate content across multiple
+//!   extractions.
+
 pub mod dom;
 pub mod error;
 pub mod extraction;
@@ -31,15 +67,36 @@ use crate::utils::{
 
 /// Parse an HTML string and extract its main readable content.
 ///
-/// Port of `Extract` (which reads from `io.Reader`; here we accept `&str` directly).
+/// This is the primary entry point. It parses the HTML, extracts metadata,
+/// identifies the main content and (optionally) comments, and returns
+/// everything as both plain text and cleaned HTML.
+///
+/// # Errors
+///
+/// Returns [`TrafilaturaError`] if:
+/// - The target language doesn't match (`LanguageMismatch`)
+/// - Required metadata is missing when `has_essential_metadata` is set
+/// - Extracted content is too short (`InsufficientContent`)
+/// - The document is a duplicate (`DuplicateContent`)
+///
+/// # Example
+///
+/// ```rust
+/// use trafilatura::{extract, Options};
+///
+/// let html = "<html><body><article><p>Hello world</p></article></body></html>";
+/// let result = extract(html, Options::default()).unwrap();
+/// assert_eq!(result.content_text, "Hello world");
+/// ```
 pub fn extract(html: &str, opts: Options) -> Result<ExtractResult, TrafilaturaError> {
     let doc = Document::parse(html);
     extract_document(doc, opts)
 }
 
-/// Extract readable content from an already-parsed `Document`.
+/// Extract readable content from an already-parsed [`Document`](dom::Document).
 ///
-/// This is the core pipeline, faithfully porting Go's `ExtractDocument`.
+/// Use this when you have a pre-parsed DOM (e.g., from [`dom::Document::parse`])
+/// and want to avoid re-parsing. The extraction pipeline is the same as [`extract`].
 ///
 /// Port of `ExtractDocument`.
 pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, TrafilaturaError> {
@@ -206,10 +263,13 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
 // Readable document builder
 // ---------------------------------------------------------------------------
 
-/// Creates a complete HTML document from an `ExtractResult`, with metadata in `<head>`
-/// and content/comments in `<body>`.
+/// Creates a complete, self-contained HTML document from an [`ExtractResult`].
 ///
-/// Port of `CreateReadableDocument` in go-trafilatura/helper.go.
+/// The output has metadata encoded as `<meta>` tags in `<head>`, article
+/// content in `<div id="content-body">`, and comments (if any) in
+/// `<div id="comments-body">`.
+///
+/// Port of `CreateReadableDocument`.
 pub fn create_readable_document(result: &ExtractResult) -> String {
     let m = &result.metadata;
 
