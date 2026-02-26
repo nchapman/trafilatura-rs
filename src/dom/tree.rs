@@ -456,11 +456,12 @@ impl Document {
 
     fn collect_comment_nodes_inner(&self, id: NodeId, out: &mut Vec<NodeId>) {
         let Some(node) = self.tree.get(id) else { return };
-        for child in node.children().map(|c| c.id()).collect::<Vec<_>>() {
-            if let Some(Node::Comment(_)) = self.tree.get(child).map(|n| n.value()) {
-                out.push(child);
+        for child in node.children() {
+            let child_id = child.id();
+            if let Node::Comment(_) = child.value() {
+                out.push(child_id);
             } else {
-                self.collect_comment_nodes_inner(child, out);
+                self.collect_comment_nodes_inner(child_id, out);
             }
         }
     }
@@ -613,8 +614,8 @@ impl Document {
             }
         }
 
-        for child_id in node.children().map(|c| c.id()).collect::<Vec<_>>() {
-            self.collect_iter(child_id, tags, true, out);
+        for child in node.children() {
+            self.collect_iter(child.id(), tags, true, out);
         }
     }
 
@@ -655,9 +656,8 @@ impl Document {
 
         *last_level = level;
 
-        let children: Vec<NodeId> = node.children().map(|c| c.id()).collect();
-        for child_id in children {
-            self.iter_text_inner(child_id, level + 1, sep, buf, last_level);
+        for child in node.children() {
+            self.iter_text_inner(child.id(), level + 1, sep, buf, last_level);
         }
     }
 
@@ -675,8 +675,8 @@ impl Document {
         if let Node::Text(t) = node.value() {
             out.push_str(t.as_ref());
         }
-        for child_id in node.children().map(|c| c.id()).collect::<Vec<_>>() {
-            self.collect_text(child_id, out);
+        for child in node.children() {
+            self.collect_text(child.id(), out);
         }
     }
 }

@@ -887,8 +887,8 @@ pub fn normalize_authors(authors: &str, input: &str) -> String {
 
 /// Port of `removeBlacklistedAuthors`.
 pub fn remove_blacklisted_authors(current: &str, opts: &Options) -> String {
-    if current.is_empty() {
-        return String::new();
+    if current.is_empty() || opts.blacklisted_authors.is_empty() {
+        return current.to_string();
     }
 
     let blacklisted: HashSet<String> = opts

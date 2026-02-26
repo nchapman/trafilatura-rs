@@ -60,7 +60,8 @@ pub fn compare_external_extraction(
         original_doc.clone_document()
     };
 
-    // Serialize to HTML for readability input.
+    // Serialize to HTML for readability input. Readability needs a clean parse
+    // (html5ever normalization) to produce correct results.
     let html_root = cleaned_doc
         .get_elements_by_tag_name(cleaned_doc.root(), "html")
         .into_iter()
@@ -120,7 +121,7 @@ fn create_fallback_generators(cleaned_html: &str, opts: &Options) -> Vec<Fallbac
         }
     }
 
-    // Built-in readability generator.
+    // Built-in readability generator — parse via readability, get tree back directly.
     let html_owned = cleaned_html.to_string();
     generators.push(Box::new(move || {
         generate_readability_candidate(&html_owned)
@@ -133,17 +134,27 @@ fn create_fallback_generators(cleaned_html: &str, opts: &Options) -> Vec<Fallbac
 /// Run the readability algorithm on the provided HTML string and return the
 /// extracted content as a `Document`.
 ///
+/// Uses `parse` for HTML input but retrieves the result tree directly via
+/// `parse_tree` to avoid re-parsing the output HTML.
+///
 /// Returns `None` if readability produces an empty result.
 ///
 /// Port of the readability generator in `createFallbackGenerators`.
 fn generate_readability_candidate(html: &str) -> Option<Document> {
-    let article = readability::Parser::new().parse(html, None).ok()?;
+    let mut parser = readability::Parser::new();
 
-    if article.content.is_empty() {
-        return None;
-    }
+    // Parse the HTML, then get the result tree back directly.
+    // This avoids the output serialize+reparse: readability result → HTML → Document.
+    let input_tree = scraper::Html::parse_document(html).tree;
+    let article = parser.parse_tree(input_tree, None).ok()?;
 
-    let doc = Document::parse(&article.content);
+    // Prefer the processed tree (zero-copy path) over re-parsing HTML.
+    let doc = if let Some(result_tree) = article.node {
+        Document::from_tree(result_tree)
+    } else {
+        Document::parse(&article.content)
+    };
+
     let body = doc.body().unwrap_or_else(|| doc.root());
     let text = doc.text_content(body);
     if trim(&text).is_empty() {
