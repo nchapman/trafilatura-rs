@@ -266,7 +266,7 @@ fn write_text(w: &mut dyn Write, result: &ExtractResult) -> io::Result<()> {
 fn write_json(w: &mut dyn Write, result: &ExtractResult) -> io::Result<()> {
     let output = JsonOutput::from(result);
     serde_json::to_writer(&mut *w, &output)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        .map_err(io::Error::other)?;
     writeln!(w)
 }
 

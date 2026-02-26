@@ -20,8 +20,7 @@ clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.12", features = ["blocking"] }
 ego-tree = "0.10"
 html5ever = "0.29"
-kuchiki = "0.8"
-readable-readability = "0.4"
+readability = { path = "../readability-rs" }
 regex = "1"
 scraper = "0.22"
 serde = { version = "1", features = ["derive"] }

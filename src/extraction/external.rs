@@ -5,10 +5,11 @@ use std::sync::LazyLock;
 
 use crate::dom::Document;
 use crate::options::{ExtractionFocus, Options};
+use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
 use crate::settings::VALID_TAG_CATALOG;
 use crate::utils::trim;
 
-use super::html_processing::doc_cleaning;
+use super::html_processing::{doc_cleaning, prune_unwanted_nodes};
 
 /// Tags removed from fallback extraction output during sanitization.
 ///
@@ -23,10 +24,16 @@ static TAGS_TO_SANITIZE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
+/// A fallback generator returns an optional `(title, Document)`.
+///
+/// Port of `_FallbackGenerator`.
+type FallbackGenerator = Box<dyn FnOnce() -> Option<(&'static str, Document)>>;
+
 /// Compare our extraction with external fallback candidates and return the best result.
 ///
-/// Mirrors Go's `compareExternalExtraction`: tries the readability fallback generator
-/// in order, using `candidate_is_usable` to decide whether to replace the result.
+/// Iterates fallback generators (user-provided candidates, readability) in order,
+/// replacing the result when `candidate_is_usable` returns true. Breaks early when
+/// `len_extracted >= MinExtractedSize`.
 ///
 /// Port of `compareExternalExtraction`.
 pub fn compare_external_extraction(
@@ -34,108 +41,109 @@ pub fn compare_external_extraction(
     extracted_doc: Document,
     opts: &Options,
 ) -> (Document, String) {
-    // The extracted_doc is the full HTML document returned by extract_content.
-    // Use the <body> as the text source to avoid counting <title>/<head> text,
-    // matching Go's behaviour where extractedDoc is the <body> fragment.
-    let compute_len = |doc: &Document| -> (usize, String) {
-        let root = doc.body().unwrap_or_else(|| doc.root());
-        let text = trim(&doc.iter_text(root, " "));
-        let len = text.chars().count();
-        (len, text)
-    };
-
-    let (initial_len, initial_text) = compute_len(&extracted_doc);
+    // Compute text length from <body>, matching Go where extractedDoc is the body fragment.
+    let extracted_text = trim(&body_text(&extracted_doc));
+    let mut len_extracted = extracted_text.chars().count();
     let mut extracted_doc = extracted_doc;
 
     // Bypass for FavorRecall when we already have plenty of text.
     if opts.focus == ExtractionFocus::FavorRecall
-        && initial_len > opts.config.min_extracted_size * 10
+        && len_extracted > opts.config.min_extracted_size * 10
     {
-        return (extracted_doc, initial_text);
+        return (extracted_doc, extracted_text);
     }
 
-    // Serialize the original doc to an HTML string for readability input.
-    // In Go this is `dom.Clone(originalDoc, true)` + optional `pruneUnwantedNodes`.
-    // We must get the <html> element (not the document root, which is not an element node).
-    let html_root = original_doc
-        .get_elements_by_tag_name(original_doc.root(), "html")
+    // Prior cleaning — clone the original and optionally prune for precision.
+    let cleaned_doc = if opts.focus == ExtractionFocus::FavorPrecision {
+        prune_unwanted_nodes(original_doc, OVERALL_DISCARDED_CONTENT, false)
+    } else {
+        original_doc.clone_document()
+    };
+
+    // Serialize to HTML for readability input.
+    let html_root = cleaned_doc
+        .get_elements_by_tag_name(cleaned_doc.root(), "html")
         .into_iter()
         .next()
-        .unwrap_or_else(|| original_doc.root());
-    let cleaned_html = original_doc.outer_html(html_root);
+        .unwrap_or_else(|| cleaned_doc.root());
+    let cleaned_html = cleaned_doc.outer_html(html_root);
 
-    // Current length (may change after each candidate check).
-    let mut len_extracted = initial_len;
+    // Process each fallback generator in order.
+    // Port of Go's `for _, generator := range createFallbackGenerators(...)`.
+    for generator in create_fallback_generators(&cleaned_html, opts) {
+        let Some((title, candidate_doc)) = generator() else {
+            continue;
+        };
 
-    // Try user-provided fallback candidates first (FallbackCandidates.readability_html).
-    // Port of go-trafilatura's FallbackCandidates.Readability handling.
-    if let Some(candidates) = &opts.fallback_candidates {
-        if let Some(ref html) = candidates.readability_html {
-            let candidate_doc = Document::parse(html);
-            let cand_root = candidate_doc.body().unwrap_or_else(|| candidate_doc.root());
-            let candidate_text = trim(&candidate_doc.iter_text(cand_root, " "));
-            let len_candidate = candidate_text.chars().count();
+        let candidate_text = trim(&body_text(&candidate_doc));
+        let len_candidate = candidate_text.chars().count();
+        let _ = title; // Used for logging in Go; available for tracing if needed.
 
-            if candidate_is_usable(&candidate_doc, &extracted_doc, len_candidate, len_extracted, opts) {
-                extracted_doc = candidate_doc;
-                len_extracted = len_candidate;
-            }
+        if candidate_is_usable(
+            &candidate_doc,
+            &extracted_doc,
+            len_candidate,
+            len_extracted,
+            opts,
+        ) {
+            extracted_doc = candidate_doc;
+            len_extracted = len_candidate;
+        }
+
+        if len_extracted >= opts.config.min_extracted_size {
+            break;
         }
     }
 
-    // Try readability fallback generator only when our own extraction is empty.
-    //
-    // Note: go-trafilatura uses go-readability which produces cleaner, more accurate
-    // output than the Rust readable-readability crate. The Rust crate sometimes picks
-    // the wrong section of the page, and if we allowed it to replace a non-empty
-    // trafilatura extraction, it would cause regressions. We therefore only apply it
-    // when trafilatura produced nothing (len_extracted == 0), which is the case where
-    // the original doc has malformed HTML that strips away in doc_cleaning.
-    if len_extracted == 0 {
-        if let Some(mut candidate_doc) = generate_readability_candidate(&cleaned_html) {
-            // Pre-strip elements that sanitize_tree would remove (destroying their children).
-            // readable-readability may keep original structural wrappers like <aside>,
-            // whereas go-readability creates clean article nodes. Stripping preserves content.
-            let cand_root = candidate_doc.root();
-            candidate_doc.strip_tags(cand_root, &["aside", "figure", "footer", "nav"]);
-
-            let cand_root = candidate_doc.body().unwrap_or_else(|| candidate_doc.root());
-            let candidate_text = trim(&candidate_doc.iter_text(cand_root, " "));
-            let len_candidate = candidate_text.chars().count();
-
-            if candidate_is_usable(&candidate_doc, &extracted_doc, len_candidate, len_extracted, opts) {
-                extracted_doc = candidate_doc;
-            }
-        }
-    }
-
-    // Final cleaning of the extraction result.
+    // Final cleaning.
     sanitize_tree(&mut extracted_doc, opts);
-    let final_root = extracted_doc.body().unwrap_or_else(|| extracted_doc.root());
-    let final_text = trim(&extracted_doc.iter_text(final_root, " "));
+    let final_text = trim(&body_text(&extracted_doc));
     (extracted_doc, final_text)
 }
 
-/// Run the `readable-readability` algorithm on the provided HTML string and return the
+/// Build the ordered list of fallback generators.
+///
+/// Order: user-provided candidates → readability.
+/// (Go also includes dom-distiller as a third generator; we omit it for now.)
+///
+/// Port of `createFallbackGenerators`.
+fn create_fallback_generators(cleaned_html: &str, opts: &Options) -> Vec<FallbackGenerator> {
+    let mut generators: Vec<FallbackGenerator> = Vec::new();
+
+    // User-provided readability candidate.
+    if let Some(candidates) = &opts.fallback_candidates {
+        if let Some(html) = candidates.readability_html.clone() {
+            generators.push(Box::new(move || {
+                let doc = Document::parse(&html);
+                Some(("Readability (user)", doc))
+            }));
+        }
+    }
+
+    // Built-in readability generator.
+    let html_owned = cleaned_html.to_string();
+    generators.push(Box::new(move || {
+        generate_readability_candidate(&html_owned)
+            .map(|doc| ("Readability", doc))
+    }));
+
+    generators
+}
+
+/// Run the readability algorithm on the provided HTML string and return the
 /// extracted content as a `Document`.
 ///
 /// Returns `None` if readability produces an empty result.
 ///
 /// Port of the readability generator in `createFallbackGenerators`.
 fn generate_readability_candidate(html: &str) -> Option<Document> {
-    let mut readability = readable_readability::Readability::new();
-    let (node, _meta) = readability.parse(html);
+    let article = readability::Parser::new().parse(html, None).ok()?;
 
-    // Serialize the kuchiki NodeRef to an HTML string, then parse into our Document.
-    let mut output = Vec::new();
-    node.serialize(&mut output).ok()?;
-    let html_string = String::from_utf8(output).ok()?;
-
-    if html_string.is_empty() {
+    if article.content.is_empty() {
         return None;
     }
 
-    let doc = Document::parse(&html_string);
+    let doc = Document::parse(&article.content);
     let body = doc.body().unwrap_or_else(|| doc.root());
     let text = doc.text_content(body);
     if trim(&text).is_empty() {
@@ -143,6 +151,12 @@ fn generate_readability_candidate(html: &str) -> Option<Document> {
     }
 
     Some(doc)
+}
+
+/// Extract text from the `<body>` of a document (or root if no body).
+fn body_text(doc: &Document) -> String {
+    let root = doc.body().unwrap_or_else(|| doc.root());
+    doc.iter_text(root, " ")
 }
 
 /// Check if a fallback candidate is better than the current extraction result.
@@ -179,11 +193,16 @@ pub fn candidate_is_usable(
             .sum();
 
         let candidate_big = len_candidate > opts.config.min_extracted_size * 2;
-        (candidate_big && (p_text_len == 0 || extracted_tables.len() > extracted_paragraphs.len()))
-            || (opts.focus == ExtractionFocus::FavorRecall
+        if candidate_big
+            && (p_text_len == 0 || extracted_tables.len() > extracted_paragraphs.len())
+        {
+            true
+        } else {
+            opts.focus == ExtractionFocus::FavorRecall
                 && extracted_heads.is_empty()
                 && !candidate_headings.is_empty()
-                && len_candidate > len_extracted)
+                && len_candidate > len_extracted
+        }
     };
 
     let must_favor_recall = len_extracted < opts.config.min_extracted_size
@@ -222,10 +241,7 @@ pub fn sanitize_tree(doc: &mut Document, opts: &Options) {
     let root = doc.root();
     doc.strip_tags(root, &["span"]);
 
-    // Step 4: strip any non-standard tags (e.g. custom/web-component elements) not in
-    // VALID_TAG_CATALOG. Most standard HTML tags survive steps 1–3; this is a safety net
-    // for unknown elements. (VALID_TAG_CATALOG intentionally covers all standard HTML tags,
-    // so this step is rarely triggered in practice — equivalent to Go's validTagCatalog.)
+    // Step 4: strip any non-standard tags not in VALID_TAG_CATALOG.
     let root = doc.root();
     let all_elements = doc.get_elements_by_tag_name(root, "*");
     let mut unique_tags: HashSet<String> = HashSet::new();
