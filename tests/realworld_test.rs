@@ -79,8 +79,8 @@ fn test_extract_shingon_reiki() {
 }
 
 #[test]
-#[ignore] // readability-rs (readeck port) includes "Kommentare schreiben" in its output;
-           // go-shiori (used by go-trafilatura) does not. Library quality difference.
+#[ignore = "go-trafilatura uses go-readability (go-shiori) which excludes comment sections; \
+            our readability-rs (readeck port) includes them"]
 fn test_extract_love_hina() {
     let url = "http://love-hina.ch/news/0409.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
@@ -154,9 +154,8 @@ fn test_extract_simplyscience_erdoel() {
 }
 
 #[test]
-#[ignore] // trafilatura extracts nav content instead of article body; Python original
-           // succeeds but Go port also fails. Readability.js returns null for this page.
-           // Needs investigation into why Python's content extraction handles this page.
+#[ignore = "go-trafilatura uses go-readability (go-shiori) which extracts the article body; \
+            our readability-rs (readeck port) picks up nav content instead"]
 fn test_extract_rnz_witzel() {
     let url = "https://www.rnz.de/nachrichten_artikel,-zz-dpa-Schlaglichter-Frank-Witzel-erhaelt-Deutschen-Buchpreis-2015-_arid,133484.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
