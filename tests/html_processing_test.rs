@@ -576,7 +576,6 @@ fn test_prune_selector_all_p_removed() {
 /// same way, so the result is empty. Behaviour is consistent with how the Spiegel test
 /// is ignored (see MEMORY.md).
 #[test]
-#[ignore = "requires Go-quality readability fallback to extract lone h1 after p-pruning"]
 fn test_prune_selector_p_keeps_h1() {
     let html = format!(
         "<html><body><h1>ABC</h1>{}</body></html>",
@@ -606,8 +605,6 @@ fn test_prune_selector_p_and_h1_empty() {
 
 /// PruneSelector="p, h1" with h1+h2+50×`<p>` → only h2 text "42" remains.
 #[test]
-#[ignore] // Pre-existing: after pruning p and h1, only h2 remains — Rust extraction
-           // pipeline returns empty for lone h2. Was masked by readable-readability fallback.
 fn test_prune_selector_p_and_h1_keeps_h2() {
     let html = format!(
         "<html><body><h1>ABC</h1><h2>42</h2>{}</body></html>",
@@ -682,7 +679,6 @@ fn test_external_scam_no_fallback_empty() {
 /// table instead, so the content check for those strings cannot pass. Marked as ignored
 /// pending a higher-quality readability fallback.
 #[test]
-#[ignore = "requires Go-quality readability fallback to filter scam.html ad links"]
 fn test_external_scam_with_fallback_nonempty() {
     let html = read_simple_fixture("scam.html");
     let opts = Options {

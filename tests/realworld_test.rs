@@ -856,10 +856,6 @@ fn test_extract_sauvonsluniversite() {
 }
 
 #[test]
-#[ignore = "Requires go-readability to extract dig-vorspann intro paragraph. \
-            The readable-readability crate removes this element during scoring. \
-            See: go-trafilatura uses go-readability fallback to recover 'Wie konnte es dazu kommen?' \
-            from <div class=\"dig-vorspann\">. Our fallback (readable-readability) does not."]
 fn test_extract_spiegel_albtraum() {
     let url = "https://www.spiegel.de/spiegel/print/d-161500790.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
