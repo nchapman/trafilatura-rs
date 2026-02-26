@@ -27,16 +27,6 @@ impl Document {
         Self { tree: html_doc.tree }
     }
 
-    /// Create a Document from an existing ego-tree (avoids re-parsing HTML).
-    pub fn from_tree(tree: ego_tree::Tree<scraper::Node>) -> Self {
-        Self { tree }
-    }
-
-    /// Clone the underlying tree (for handing to readability without losing our copy).
-    pub fn clone_tree(&self) -> ego_tree::Tree<scraper::Node> {
-        self.tree.clone()
-    }
-
     /// Return the NodeId of the tree root (a Document node, not an Element).
     pub fn root(&self) -> NodeId {
         self.tree.root().id()

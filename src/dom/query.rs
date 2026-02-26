@@ -1,37 +1,9 @@
 // Port of CSS selector queries (dom.QuerySelector, dom.QuerySelectorAll, dom.GetElementsByTagName)
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-
 use ego_tree::NodeId;
 use scraper::{Node, Selector};
 
 use super::Document;
-
-thread_local! {
-    /// Cache of parsed CSS selectors, keyed by selector string.
-    /// Avoids re-compiling the same selector on every call.
-    static SELECTOR_CACHE: RefCell<HashMap<String, Selector>> = RefCell::new(HashMap::new());
-}
-
-/// Look up or compile a CSS selector, returning a clone from the cache.
-/// The cache is bounded to 256 entries per thread; exceeding that clears
-/// and rebuilds (all current call sites use compile-time-constant selectors,
-/// so this cap is a safety net against dynamic selector strings).
-fn cached_selector(selector: &str) -> Option<Selector> {
-    SELECTOR_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some(sel) = cache.get(selector) {
-            return Some(sel.clone());
-        }
-        let sel = Selector::parse(selector).ok()?;
-        if cache.len() >= 256 {
-            cache.clear();
-        }
-        cache.insert(selector.to_owned(), sel.clone());
-        Some(sel)
-    })
-}
 
 impl Document {
     /// Find the first element (in document order) within the subtree rooted at
@@ -41,7 +13,7 @@ impl Document {
     ///
     /// Port of `dom.QuerySelector`.
     pub fn query_selector(&self, root: NodeId, selector: &str) -> Option<NodeId> {
-        let sel = cached_selector(selector)?;
+        let sel = Selector::parse(selector).ok()?;
         self.query_first_compiled(root, &sel)
     }
 
@@ -50,7 +22,7 @@ impl Document {
     ///
     /// Port of `dom.QuerySelectorAll`.
     pub fn query_selector_all(&self, root: NodeId, selector: &str) -> Vec<NodeId> {
-        let Some(sel) = cached_selector(selector) else { return Vec::new() };
+        let Ok(sel) = Selector::parse(selector) else { return Vec::new() };
         self.query_selector_all_compiled(root, &sel)
     }
 

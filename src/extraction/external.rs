@@ -134,27 +134,18 @@ fn create_fallback_generators(cleaned_html: &str, opts: &Options) -> Vec<Fallbac
 /// Run the readability algorithm on the provided HTML string and return the
 /// extracted content as a `Document`.
 ///
-/// Uses `parse` for HTML input but retrieves the result tree directly via
-/// `parse_tree` to avoid re-parsing the output HTML.
-///
 /// Returns `None` if readability produces an empty result.
 ///
 /// Port of the readability generator in `createFallbackGenerators`.
 fn generate_readability_candidate(html: &str) -> Option<Document> {
     let mut parser = readability::Parser::new();
+    let article = parser.parse(html, None).ok()?;
 
-    // Parse the HTML, then get the result tree back directly.
-    // This avoids the output serialize+reparse: readability result → HTML → Document.
-    let input_tree = scraper::Html::parse_document(html).tree;
-    let article = parser.parse_tree(input_tree, None).ok()?;
+    if article.content.is_empty() {
+        return None;
+    }
 
-    // Prefer the processed tree (zero-copy path) over re-parsing HTML.
-    let doc = if let Some(result_tree) = article.node {
-        Document::from_tree(result_tree)
-    } else {
-        Document::parse(&article.content)
-    };
-
+    let doc = Document::parse(&article.content);
     let body = doc.body().unwrap_or_else(|| doc.root());
     let text = doc.text_content(body);
     if trim(&text).is_empty() {
