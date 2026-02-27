@@ -9,18 +9,18 @@ use crate::utils::{str_or, str_word_count, trim, unescape_html, uniquify_lists};
 
 /// Schema.org data extracted from a JSON-LD script block.
 #[derive(Clone)]
-pub struct SchemaData {
-    pub types: Vec<String>,
-    pub data: Map<String, Value>,
-    pub importance: f64,
+pub(crate) struct SchemaData {
+    pub(crate) types: Vec<String>,
+    pub(crate) data: Map<String, Value>,
+    pub(crate) importance: f64,
     /// Types of the parent schema node in the JSON-LD tree.
-    pub parent_types: Option<Vec<String>>,
+    pub(crate) parent_types: Option<Vec<String>>,
     /// Types of the grandparent schema node (parent's parent).
-    pub grandparent_types: Option<Vec<String>>,
+    pub(crate) grandparent_types: Option<Vec<String>>,
 }
 
 /// Port of `extractJsonLd`.
-pub fn extract_json_ld(opts: &Options, doc: &Document, original_metadata: Metadata) -> Metadata {
+pub(crate) fn extract_json_ld(opts: &Options, doc: &Document, original_metadata: Metadata) -> Metadata {
     let mut metadata = Metadata::default();
     let (persons, organizations, articles) = decode_json_ld(doc, opts);
 
@@ -336,7 +336,7 @@ fn find_important_objects(
 }
 
 /// Port of `getSchemaNames`.
-pub fn get_schema_names(v: &Value, expected_types: &[&str]) -> Vec<String> {
+pub(crate) fn get_schema_names(v: &Value, expected_types: &[&str]) -> Vec<String> {
     use crate::utils::regex_patterns::{JSON_SYMBOL, NAME_JSON};
 
     match v {
@@ -416,7 +416,7 @@ pub fn get_schema_names(v: &Value, expected_types: &[&str]) -> Vec<String> {
 }
 
 /// Port of `getSchemaTypes`.
-pub fn get_schema_types(obj: &Map<String, Value>, to_lower: bool) -> Vec<String> {
+pub(crate) fn get_schema_types(obj: &Map<String, Value>, to_lower: bool) -> Vec<String> {
     let mut types = get_string_values(obj, "@type");
     if to_lower {
         for t in &mut types {
@@ -427,7 +427,7 @@ pub fn get_schema_types(obj: &Map<String, Value>, to_lower: bool) -> Vec<String>
 }
 
 /// Port of `getStringValues`.
-pub fn get_string_values(obj: &Map<String, Value>, key: &str) -> Vec<String> {
+pub(crate) fn get_string_values(obj: &Map<String, Value>, key: &str) -> Vec<String> {
     match obj.get(key) {
         Some(Value::String(s)) => {
             let s = trim(s);
@@ -449,7 +449,7 @@ pub fn get_string_values(obj: &Map<String, Value>, key: &str) -> Vec<String> {
 }
 
 /// Port of `getSingleStringValue`.
-pub fn get_single_string_value(obj: &Map<String, Value>, key: &str) -> String {
+pub(crate) fn get_single_string_value(obj: &Map<String, Value>, key: &str) -> String {
     get_string_values(obj, key).into_iter().next().unwrap_or_default()
 }
 

@@ -84,13 +84,14 @@ fn comparison_detail() {
         };
 
         let url = url::Url::parse(&entry.url).ok();
-        let opts = Options {
-            original_url: url,
-            enable_fallback: true,
-            focus: ExtractionFocus::Balanced,
-            exclude_comments: true,
-            exclude_tables: false,
-            ..Options::default()
+        let opts = {
+            let mut o = Options::default();
+            o.original_url = url;
+            o.enable_fallback = true;
+            o.focus = ExtractionFocus::Balanced;
+            o.exclude_comments = true;
+            o.exclude_tables = false;
+            o
         };
 
         let text = trafilatura::extract(&html, opts)

@@ -7,23 +7,23 @@ use crate::selector::utils::{contains, get_node_ancestors, lower, starts_with};
 /// Rules to find author metadata elements.
 ///
 /// Port of `MetaAuthor`.
-pub const META_AUTHOR: &[super::Rule] = &[meta_author_rule1, meta_author_rule2, meta_author_rule3];
+pub(crate) const META_AUTHOR: &[super::Rule] = &[meta_author_rule1, meta_author_rule2, meta_author_rule3];
 
 /// Rules to discard false-positive author matches.
 ///
 /// Port of `MetaAuthorDiscard`.
-pub const META_AUTHOR_DISCARD: &[super::Rule] =
+pub(crate) const META_AUTHOR_DISCARD: &[super::Rule] =
     &[meta_author_discard_rule1, meta_author_discard_rule2];
 
 /// Rules to find title metadata elements.
 ///
 /// Port of `MetaTitle`.
-pub const META_TITLE: &[super::Rule] = &[meta_title_rule1, meta_title_rule2, meta_title_rule3];
+pub(crate) const META_TITLE: &[super::Rule] = &[meta_title_rule1, meta_title_rule2, meta_title_rule3];
 
 /// Rules to find category metadata links.
 ///
 /// Port of `MetaCategories`.
-pub const META_CATEGORIES: &[super::Rule] = &[
+pub(crate) const META_CATEGORIES: &[super::Rule] = &[
     meta_categories_rule1,
     meta_categories_rule2,
     meta_categories_rule3,
@@ -35,7 +35,7 @@ pub const META_CATEGORIES: &[super::Rule] = &[
 /// Rules to find tag metadata links.
 ///
 /// Port of `MetaTags`.
-pub const META_TAGS: &[super::Rule] = &[
+pub(crate) const META_TAGS: &[super::Rule] = &[
     meta_tags_rule1,
     meta_tags_rule2,
     meta_tags_rule3,

@@ -30,7 +30,7 @@ fn basic_cleaning(doc: &mut Document) {
 /// the corresponding plain-text string.
 ///
 /// Port of `baseline`.
-pub fn baseline(doc: &mut Document) -> (Document, String) {
+pub(crate) fn baseline(doc: &mut Document) -> (Document, String) {
     let mut result = Document::parse("<html><body></body></html>");
     let result_body = result.body().expect("parsed result document has <body>");
     let mut tmp_text = String::new();

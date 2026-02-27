@@ -1,0 +1,3 @@
+# Keep defaults — this file exists to ensure `cargo fmt` uses consistent settings.
+# Explicit settings documented here for visibility.
+edition = "2021"

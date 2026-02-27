@@ -35,15 +35,29 @@
 //!   target language (detected via `whatlang`).
 //! - **Deduplication** — LRU-based detection of duplicate content across multiple
 //!   extractions.
+//!
+//! # Builder-style options
+//!
+//! ```rust
+//! use trafilatura::{extract, Options, ExtractionFocus};
+//!
+//! let html = "<html><body><article><p>Hello world</p></article></body></html>";
+//! let opts = Options::default()
+//!     .with_fallback(true)
+//!     .with_links(true)
+//!     .with_focus(ExtractionFocus::FavorRecall);
+//! let result = extract(html, opts).unwrap();
+//! assert_eq!(result.content_text, "Hello world");
+//! ```
 
 pub mod dom;
 pub mod error;
-pub mod extraction;
+pub(crate) mod extraction;
 pub mod metadata;
 pub mod options;
 pub mod result;
-pub mod selector;
-pub mod settings;
+pub(crate) mod selector;
+pub(crate) mod settings;
 pub mod utils;
 
 // Convenience re-exports for library users and the CLI binary.
@@ -141,7 +155,7 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
 
     // Apply user-specified prune selector (no backup — this is under full user control).
     let mut doc = doc;
-    if let Some(sel) = &opts.prune_selector.clone() {
+    if let Some(sel) = &opts.prune_selector {
         let root = doc.root();
         let to_remove = doc.query_selector_all(root, sel);
         for id in to_remove.into_iter().rev() {

@@ -1,10 +1,10 @@
 // Port of go-trafilatura/utils-common.go
 
 pub mod language;
-pub mod lru;
-pub mod regex_patterns;
-pub mod text;
-pub mod url;
+pub(crate) mod lru;
+pub(crate) mod regex_patterns;
+pub(crate) mod text;
+pub(crate) mod url;
 
 use std::path::Path;
 
@@ -34,21 +34,21 @@ pub fn trim(s: &str) -> String {
 /// Counts words (whitespace-delimited tokens) in a string.
 ///
 /// Port of `strWordCount`.
-pub fn str_word_count(s: &str) -> usize {
+pub(crate) fn str_word_count(s: &str) -> usize {
     s.split_whitespace().count()
 }
 
 /// Returns the first non-empty string from the arguments.
 ///
 /// Port of `strOr`.
-pub fn str_or<'a>(args: &[&'a str]) -> &'a str {
+pub(crate) fn str_or<'a>(args: &[&'a str]) -> &'a str {
     args.iter().find(|&&s| !s.is_empty()).copied().unwrap_or("")
 }
 
 /// Checks if an element has a valid image `src` or `data-src` attribute.
 ///
 /// Port of `isImageElement`.
-pub fn is_image_element(doc: &Document, id: NodeId) -> bool {
+pub(crate) fn is_image_element(doc: &Document, id: NodeId) -> bool {
     for attr_name in ["src", "data-src", "data-srcset"] {
         if let Some(val) = doc.get_attribute(id, attr_name) {
             if is_image_file(&val) {
@@ -72,7 +72,7 @@ pub fn is_image_element(doc: &Document, id: NodeId) -> bool {
 /// Checks whether a file path/URL appears to point to an image file.
 ///
 /// Port of `isImageFile`.
-pub fn is_image_file(src: &str) -> bool {
+pub(crate) fn is_image_file(src: &str) -> bool {
     if src.is_empty() {
         return false;
     }
@@ -93,7 +93,7 @@ pub fn is_image_file(src: &str) -> bool {
 /// Strips quotes and trims whitespace from each entry.
 ///
 /// Port of `uniquifyLists`.
-pub fn uniquify_lists(inputs: &[&str]) -> Vec<String> {
+pub(crate) fn uniquify_lists(inputs: &[&str]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     let mut result = Vec::new();
 
@@ -123,7 +123,7 @@ pub fn uniquify_lists(inputs: &[&str]) -> Vec<String> {
 ///
 /// Handles named entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&nbsp;`, etc.)
 /// and numeric references (`&#NNN;`, `&#xHHH;`).
-pub fn unescape_html(s: &str) -> String {
+pub(crate) fn unescape_html(s: &str) -> String {
     if !s.contains('&') {
         return s.to_string();
     }
@@ -216,7 +216,7 @@ pub fn unescape_html(s: &str) -> String {
 /// Covers: Misc Symbols/Dingbats (U+2600–U+27BF), Supplemental Arrows &
 /// Dingbats (U+2900–U+2BFF), supplementary emoji planes (U+1F000–U+1FFFF),
 /// variation selectors (U+FE00–U+FE0F), and the Tags block (U+E0000–U+E007F).
-pub fn remove_emojis(s: &str) -> String {
+pub(crate) fn remove_emojis(s: &str) -> String {
     s.chars()
         .filter(|&c| {
             let cp = c as u32;

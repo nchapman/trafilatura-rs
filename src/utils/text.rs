@@ -10,7 +10,7 @@ use crate::utils::trim;
 /// Returns `true` if the node's text should be filtered out.
 ///
 /// Port of `textFilter`.
-pub fn text_filter(doc: &Document, id: NodeId) -> bool {
+pub(crate) fn text_filter(doc: &Document, id: NodeId) -> bool {
     let text = doc.text(id);
     let tail = doc.tail(id);
 
@@ -26,7 +26,7 @@ pub fn text_filter(doc: &Document, id: NodeId) -> bool {
 /// Returns `true` if the string contains meaningful (non-whitespace) content.
 ///
 /// Port of `textCharsTest`.
-pub fn text_chars_test(s: &str) -> bool {
+pub(crate) fn text_chars_test(s: &str) -> bool {
     !trim(s).is_empty()
 }
 
@@ -35,7 +35,7 @@ pub fn text_chars_test(s: &str) -> bool {
 /// Always increments the count in the cache when the text is long enough.
 ///
 /// Port of `duplicateTest`.
-pub fn duplicate_test(doc: &Document, id: NodeId, cache: &mut LruCache, opts: &Options) -> bool {
+pub(crate) fn duplicate_test(doc: &Document, id: NodeId, cache: &mut LruCache, opts: &Options) -> bool {
     let test_string = trim(&doc.iter_text(id, " "));
 
     if test_string.chars().count() > opts.config.min_duplicate_check_size {

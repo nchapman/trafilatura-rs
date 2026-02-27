@@ -209,18 +209,17 @@ fn build_options(cli: &Cli) -> Options {
         ExtractionFocus::Balanced
     };
 
-    Options {
-        enable_fallback: !cli.no_fallback,
-        target_language: cli.language.clone(),
-        exclude_comments: cli.no_comments,
-        exclude_tables: cli.no_tables,
-        include_images: cli.images,
-        include_links: cli.links,
-        focus,
-        deduplicate: cli.deduplicate,
-        has_essential_metadata: cli.has_metadata,
-        ..Options::default()
-    }
+    let mut o = Options::default();
+    o.enable_fallback = !cli.no_fallback;
+    o.target_language = cli.language.clone();
+    o.exclude_comments = cli.no_comments;
+    o.exclude_tables = cli.no_tables;
+    o.include_images = cli.images;
+    o.include_links = cli.links;
+    o.focus = focus;
+    o.deduplicate = cli.deduplicate;
+    o.has_essential_metadata = cli.has_metadata;
+    o
 }
 
 // ---------------------------------------------------------------------------

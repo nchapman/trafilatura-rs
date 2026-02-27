@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-pub static TAGS_TO_CLEAN: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static TAGS_TO_CLEAN: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         // important
         "aside", "embed", "footer", "form", "head", "iframe", "menu", "object", "script",
@@ -19,7 +19,7 @@ pub static TAGS_TO_CLEAN: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
-pub static TAGS_TO_STRIP: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static TAGS_TO_STRIP: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "abbr", "acronym", "address", "bdi", "bdo", "big", "cite", "data", "dfn", "font",
         "hgroup", "img", "ins", "mark", "meta", "ruby", "small", "template", "tbody", "tfoot",
@@ -29,7 +29,7 @@ pub static TAGS_TO_STRIP: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
-pub static EMPTY_TAGS_TO_REMOVE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static EMPTY_TAGS_TO_REMOVE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "article", "b", "blockquote", "dd", "div", "dt", "em", "h1", "h2", "h3", "h4", "h5",
         "h6", "i", "li", "main", "p", "pre", "q", "section", "span", "strong",
@@ -38,7 +38,7 @@ pub static EMPTY_TAGS_TO_REMOVE: LazyLock<HashSet<&'static str>> = LazyLock::new
     .collect()
 });
 
-pub static TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "blockquote", "code", "del", "s", "strike", "h1", "h2", "h3", "h4", "h5", "h6", "em",
         "i", "b", "strong", "u", "kbd", "samp", "tt", "var", "sub", "sup", "br", "hr", "ul",
@@ -48,13 +48,13 @@ pub static TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
-pub static FORMAT_TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static FORMAT_TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     ["em", "i", "b", "strong", "u", "kbd", "samp", "tt", "var", "sub", "sup"]
         .into_iter()
         .collect()
 });
 
-pub static VALID_TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static VALID_TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "a", "abbr", "address", "area", "b", "base", "bdo", "blockquote", "body", "br", "button",
         "caption", "cite", "code", "col", "colgroup", "dd", "del", "dfn", "div", "dl", "dt",
@@ -71,29 +71,29 @@ pub static VALID_TAG_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(||
     .collect()
 });
 
-pub static ELEMENT_WITH_SIZE_ATTR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static ELEMENT_WITH_SIZE_ATTR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     ["table", "th", "td", "hr", "pre"].into_iter().collect()
 });
 
 // Tag category lists from tag-converter.go
 // Used by element handlers in main-extractor.go for dispatch
 
-pub static XML_LIST_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_LIST_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["ul", "ol", "dl"].into_iter().collect());
 
-pub static XML_QUOTE_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_QUOTE_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["blockquote", "pre", "q"].into_iter().collect());
 
-pub static XML_HEAD_TAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static XML_HEAD_TAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     ["h1", "h2", "h3", "h4", "h5", "h6", "summary"]
         .into_iter()
         .collect()
 });
 
-pub static XML_LB_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_LB_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["br", "hr", "lb"].into_iter().collect());
 
-pub static XML_HI_TAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static XML_HI_TAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "em", "i", "b", "strong", "u", "kbd", "samp", "tt", "var", "sub", "sup", "mark",
     ]
@@ -101,21 +101,21 @@ pub static XML_HI_TAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
-pub static XML_REF_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_REF_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["a"].into_iter().collect());
 
-pub static XML_GRAPHIC_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_GRAPHIC_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["img"].into_iter().collect());
 
-pub static XML_ITEM_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_ITEM_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["li", "dt", "dd"].into_iter().collect());
 
-pub static XML_CELL_TAGS: LazyLock<HashSet<&'static str>> =
+pub(crate) static XML_CELL_TAGS: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| ["td", "th"].into_iter().collect());
 
 /// Allowlist of HTML attributes retained during post-cleaning.
 /// Taken from go-domdistiller (via go-trafilatura/settings.go).
-pub static ALLOWED_ATTRIBUTES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub(crate) static ALLOWED_ATTRIBUTES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "abbr", "accept-charset", "accept", "accesskey", "action", "align", "alink",
         "allow", "allowfullscreen", "allowpaymentrequest", "alt", "archive", "as",

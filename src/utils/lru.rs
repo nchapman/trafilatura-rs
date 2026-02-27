@@ -1,6 +1,6 @@
 // Port of go-trafilatura/internal/lru/cache.go
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 /// Simple FIFO-eviction cache mapping strings to integer counts.
 ///
@@ -9,10 +9,10 @@ use std::collections::HashMap;
 ///
 /// Note: despite the name "LRU", the Go implementation uses FIFO eviction
 /// (oldest-inserted, not least-recently-used). We match that behavior exactly.
-pub struct LruCache {
+pub(crate) struct LruCache {
     max_size: usize,
     /// Insertion-ordered list of keys (oldest first).
-    keys: Vec<String>,
+    keys: VecDeque<String>,
     data: HashMap<String, usize>,
 }
 
@@ -20,7 +20,7 @@ impl LruCache {
     pub fn new(max_size: usize) -> Self {
         Self {
             max_size,
-            keys: Vec::new(),
+            keys: VecDeque::new(),
             data: HashMap::new(),
         }
     }
@@ -53,11 +53,12 @@ impl LruCache {
 
         // Evict oldest if at capacity.
         if self.max_size > 0 && self.keys.len() >= self.max_size {
-            let oldest = self.keys.remove(0);
-            self.data.remove(&oldest);
+            if let Some(oldest) = self.keys.pop_front() {
+                self.data.remove(&oldest);
+            }
         }
 
-        self.keys.push(key.clone());
+        self.keys.push_back(key.clone());
         self.data.insert(key, value);
     }
 

@@ -8,14 +8,12 @@ use trafilatura::{
 
 /// Port of zeroConfig / zeroOpts: relax size thresholds so small fragments extract.
 fn zero_opts() -> Options {
-    Options {
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Default::default()
-        },
-        ..Default::default()
-    }
+    let mut c = Config::default();
+    c.min_extracted_size = 0;
+    c.min_output_size = 0;
+    let mut o = Options::default();
+    o.config = c;
+    o
 }
 
 /// Wrap an HTML snippet in a minimal full document with an `<article>` body.
@@ -92,9 +90,10 @@ fn test_table_complex_with_links() {
             </table>
         </article>
     </body></html>";
-    let opts = Options {
-        include_links: true,
-        ..zero_opts()
+    let opts = {
+        let mut o = zero_opts();
+        o.include_links = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -157,9 +156,10 @@ fn test_table_with_th_headers() {
             <tr><td>February</td><td>28</td></tr>
         </table>",
     );
-    let opts = Options {
-        include_links: true,
-        ..zero_opts()
+    let opts = {
+        let mut o = zero_opts();
+        o.include_links = true;
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(
@@ -237,9 +237,10 @@ fn test_table_bold_in_cell() {
             </table>
         </article>
     </body></html>";
-    let opts = Options {
-        include_links: true,
-        ..zero_opts()
+    let opts = {
+        let mut o = zero_opts();
+        o.include_links = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -263,9 +264,10 @@ fn test_table_high_link_density_discarded() {
     let html = format!(
         "<html><body><article><table><tr><td><a href=\"test.html\">{long_link_text}</a></td></tr></table></article></body></html>"
     );
-    let opts = Options {
-        include_links: true,
-        ..zero_opts()
+    let opts = {
+        let mut o = zero_opts();
+        o.include_links = true;
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(
@@ -283,9 +285,10 @@ fn test_table_nested_1() {
     <html><body><article>
         <table><th>1</th><table><tr><td>2</td></tr></table></table>
     </article></body></html>";
-    let opts = Options {
-        include_links: true,
-        ..zero_opts()
+    let opts = {
+        let mut o = zero_opts();
+        o.include_links = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -317,9 +320,10 @@ fn test_table_with_list_favor_recall() {
         </table>",
     );
     // With FavorRecall, list items inside the table cell should appear.
-    let opts = Options {
-        focus: ExtractionFocus::FavorRecall,
-        ..zero_opts()
+    let opts = {
+        let mut o = zero_opts();
+        o.focus = ExtractionFocus::FavorRecall;
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(

@@ -970,9 +970,12 @@ fn test_extract_exotic_tags() {
     // Naked div with <br>: content should be joined with spaces.
     // Uses zero config (MinExtractedSize=0) to match Go's zeroConfig in Test_ExoticTags.
     let html = "<html><body><main><div>1.<br/>2.<br/>3.<br/></div></main></body></html>";
-    let zero_opts = trafilatura::options::Options {
-        config: trafilatura::options::Config { min_extracted_size: 0, ..Default::default() },
-        ..Default::default()
+    let zero_opts = {
+        let mut c = trafilatura::options::Config::default();
+        c.min_extracted_size = 0;
+        let mut o = trafilatura::options::Options::default();
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(html, zero_opts).expect("naked div with br should extract");
     assert!(result.content_text.contains("1. 2. 3."));
@@ -986,10 +989,11 @@ fn test_extract_exotic_tags() {
 
     // Empty <a> inside <strong> must not cause empty output
     let html = r#"<html><body><div><h1>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</h1><h2>Sed et interdum lectus.</h2><p>Quisque molestie nunc eu arcu condimentum fringilla.</p><strong><a></a></strong><h2>Aliquam eget interdum elit, id posuere ipsum.</h2><p>Phasellus lectus erat, hendrerit sed tortor ac, dignissim vehicula metus.<br/></p></div></body></html>"#;
-    let opts = trafilatura::options::Options {
-        include_links: true,
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = trafilatura::options::Options::default();
+        o.include_links = true;
+        o.include_images = true;
+        o
     };
     let result = trafilatura::extract(html, opts).expect("empty-a inside strong should not crash");
     assert!(!result.content_text.is_empty());
@@ -1001,11 +1005,12 @@ fn test_extract_exotic_tags() {
         trafilatura::options::ExtractionFocus::FavorRecall,
         trafilatura::options::ExtractionFocus::FavorPrecision,
     ] {
-        let opts = trafilatura::options::Options {
-            include_links: true,
-            include_images: true,
-            focus,
-            ..Default::default()
+        let opts = {
+            let mut o = trafilatura::options::Options::default();
+            o.include_links = true;
+            o.include_images = true;
+            o.focus = focus;
+            o
         };
         let result = trafilatura::extract(html, opts)
             .unwrap_or_else(|_| panic!("em-wrapping-p should extract (focus={focus:?})"));

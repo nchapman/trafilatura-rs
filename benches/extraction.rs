@@ -55,13 +55,10 @@ fn load_corpus() -> Vec<String> {
 }
 
 fn default_opts() -> Options {
-    Options {
-        enable_fallback: true,
-        focus: ExtractionFocus::Balanced,
-        exclude_comments: true,
-        exclude_tables: false,
-        ..Options::default()
-    }
+    Options::default()
+        .with_fallback(true)
+        .with_focus(ExtractionFocus::Balanced)
+        .with_exclude_comments(true)
 }
 
 // ---------------------------------------------------------------------------
@@ -141,13 +138,10 @@ fn bench_modes(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(bytes));
 
     for &(label, enable_fallback, focus) in modes {
-        let opts = Options {
-            enable_fallback,
-            focus,
-            exclude_comments: true,
-            exclude_tables: false,
-            ..Options::default()
-        };
+        let opts = Options::default()
+            .with_fallback(enable_fallback)
+            .with_focus(focus)
+            .with_exclude_comments(true);
         group.bench_with_input(
             BenchmarkId::new("extract", label),
             &html,

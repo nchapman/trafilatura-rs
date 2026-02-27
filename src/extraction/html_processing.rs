@@ -16,7 +16,7 @@ use crate::selector::query_all;
 /// Cleans the document by discarding unwanted elements.
 ///
 /// Port of `docCleaning` (originally `tree_cleaning` in Python trafilatura).
-pub fn doc_cleaning(doc: &mut Document, opts: &Options) {
+pub(crate) fn doc_cleaning(doc: &mut Document, opts: &Options) {
     // Build cleaning and stripping lists, then modify based on options.
     let mut cleaning_list: std::collections::HashSet<&'static str> = TAGS_TO_CLEAN.clone();
     let mut stripping_list: std::collections::HashSet<&'static str> = TAGS_TO_STRIP.clone();
@@ -76,7 +76,7 @@ pub fn doc_cleaning(doc: &mut Document, opts: &Options) {
 /// Removes all HTML comment nodes from the document.
 ///
 /// Port of `removeHtmlCommentNode`.
-pub fn remove_html_comment_nodes(doc: &mut Document) {
+pub(crate) fn remove_html_comment_nodes(doc: &mut Document) {
     // Collect all comment node IDs first (can't mutate while iterating).
     let comment_ids: Vec<NodeId> = doc.collect_comment_nodes(doc.root());
     for id in comment_ids.into_iter().rev() {
@@ -88,7 +88,7 @@ pub fn remove_html_comment_nodes(doc: &mut Document) {
 /// Deletes selected empty elements to save space and processing time.
 ///
 /// Port of `pruneHTML`.
-pub fn prune_html(doc: &mut Document, opts: &Options) {
+pub(crate) fn prune_html(doc: &mut Document, opts: &Options) {
     let keep_tail = opts.focus != ExtractionFocus::FavorPrecision;
     let all_elements = doc.get_elements_by_tag_name(doc.root(), "*");
 
@@ -109,7 +109,7 @@ pub fn prune_html(doc: &mut Document, opts: &Options) {
 /// Always returns an owned clone of the (potentially pruned) document.
 ///
 /// Port of `pruneUnwantedNodes`.
-pub fn prune_unwanted_nodes(doc: &Document, rules: &[Rule], with_backup: bool) -> Document {
+pub(crate) fn prune_unwanted_nodes(doc: &Document, rules: &[Rule], with_backup: bool) -> Document {
     let (backup, old_len) = if with_backup {
         let text_len = doc.iter_text(doc.root(), " ").chars().count();
         (Some(doc.clone_document()), text_len)
@@ -157,10 +157,10 @@ pub fn prune_unwanted_nodes(doc: &Document, rules: &[Rule], with_backup: bool) -
 /// Returns `None` if the node should be discarded.
 ///
 /// Port of `handleTextNode`.
-pub fn handle_text_node(
+pub(crate) fn handle_text_node(
     doc: &mut Document,
     id: NodeId,
-    cache: Option<&mut LruCache>,
+    cache: &mut LruCache,
     fix_comments: bool,
     preserve_spaces: bool,
     opts: &Options,
@@ -217,12 +217,8 @@ pub fn handle_text_node(
         return None;
     }
 
-    if opts.deduplicate {
-        if let Some(cache) = cache {
-            if duplicate_test(doc, id, cache, opts) {
-                return None;
-            }
-        }
+    if opts.deduplicate && duplicate_test(doc, id, cache, opts) {
+        return None;
     }
 
     Some(id)
@@ -232,7 +228,7 @@ pub fn handle_text_node(
 /// Returns `(non_empty_links, is_high_density)`.
 ///
 /// Port of `linkDensityTest`.
-pub fn link_density_test(
+pub(crate) fn link_density_test(
     doc: &Document,
     element: NodeId,
     opts: &Options,
@@ -299,7 +295,7 @@ pub fn link_density_test(
 /// Checks whether a table will be removed because it's link-heavy (probably boilerplate).
 ///
 /// Port of `linkDensityTestTables`.
-pub fn link_density_test_tables(doc: &Document, table: NodeId, _opts: &Options) -> bool {
+pub(crate) fn link_density_test_tables(doc: &Document, table: NodeId, _opts: &Options) -> bool {
     let links = doc.get_elements_by_tag_name(table, "a");
     if links.is_empty() {
         return false;
@@ -330,7 +326,7 @@ pub fn link_density_test_tables(doc: &Document, table: NodeId, _opts: &Options) 
 /// Returns `(total_link_length, n_short_links, non_empty_links)`.
 ///
 /// Port of `collectLinkInfo`.
-pub fn collect_link_info(
+pub(crate) fn collect_link_info(
     doc: &Document,
     links: &[NodeId],
 ) -> (usize, usize, Vec<NodeId>) {
@@ -359,10 +355,10 @@ pub fn collect_link_info(
 /// Returns `None` if the node should be discarded.
 ///
 /// Port of `processNode`.
-pub fn process_node(
+pub(crate) fn process_node(
     doc: &mut Document,
     id: NodeId,
-    cache: Option<&mut LruCache>,
+    cache: &mut LruCache,
     opts: &Options,
 ) -> Option<NodeId> {
     let tag = doc.tag_name(id).to_string();
@@ -395,10 +391,8 @@ pub fn process_node(
         if text_filter(doc, id) {
             return None;
         }
-        if let Some(cache) = cache {
-            if opts.deduplicate && duplicate_test(doc, id, cache, opts) {
-                return None;
-            }
+        if opts.deduplicate && duplicate_test(doc, id, cache, opts) {
+            return None;
         }
     }
 
@@ -411,7 +405,7 @@ pub fn process_node(
 /// it modifies `doc` directly. It also has no backup mechanism. Used by
 /// `extract_content` so that "done" marks on processed elements persist across
 /// selector-rule iterations, matching Go's in-place behavior.
-pub fn prune_unwanted_nodes_inplace(doc: &mut Document, subtree_id: NodeId, rules: &[Rule]) {
+pub(crate) fn prune_unwanted_nodes_inplace(doc: &mut Document, subtree_id: NodeId, rules: &[Rule]) {
     let matches = query_all(doc, subtree_id, rules);
     for &id in matches.iter().rev() {
         let tail = doc.tail(id);
@@ -435,7 +429,7 @@ pub fn prune_unwanted_nodes_inplace(doc: &mut Document, subtree_id: NodeId, rule
 /// Removes empty nodes and strips disallowed attributes.
 ///
 /// Port of `postCleaning`.
-pub fn post_cleaning(doc: &mut Document) {
+pub(crate) fn post_cleaning(doc: &mut Document) {
     // Remove empty nodes (backward, so children are removed before parents).
     let children = doc.get_elements_by_tag_name(doc.root(), "*");
     for &id in children.iter().rev() {
@@ -479,7 +473,7 @@ pub fn post_cleaning(doc: &mut Document) {
 /// Deletes link-dense elements from a subtree.
 ///
 /// Port of `deleteByLinkDensity`.
-pub fn delete_by_link_density(
+pub(crate) fn delete_by_link_density(
     doc: &mut Document,
     subtree: NodeId,
     opts: &Options,
@@ -529,7 +523,7 @@ pub fn delete_by_link_density(
 /// Simplifies HTML markup by handling link conversion and code detection.
 ///
 /// Port of `convertTags`.
-pub fn convert_tags(doc: &mut Document, opts: &Options) {
+pub(crate) fn convert_tags(doc: &mut Document, opts: &Options) {
     if !opts.include_links {
         // Protect links inside relevant containers.
         let css_selector = if opts.exclude_tables {

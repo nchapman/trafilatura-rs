@@ -6,7 +6,7 @@ use url::Url;
 /// Returns the parsed URL on success.
 ///
 /// Port of `isAbsoluteURL`.
-pub fn is_absolute_url(s: &str) -> bool {
+pub(crate) fn is_absolute_url(s: &str) -> bool {
     parse_http_url(s).is_some()
 }
 
@@ -23,7 +23,7 @@ fn parse_http_url(s: &str) -> Option<Url> {
 /// If the URL is already absolute, it is returned unchanged.
 ///
 /// Port of `createAbsoluteURL`.
-pub fn create_absolute_url(url_str: &str, base: Option<&Url>) -> String {
+pub(crate) fn create_absolute_url(url_str: &str, base: Option<&Url>) -> String {
     let Some(base) = base else {
         return url_str.to_string();
     };
@@ -54,7 +54,7 @@ pub fn create_absolute_url(url_str: &str, base: Option<&Url>) -> String {
 /// Returns empty string if the URL is not absolute.
 ///
 /// Port of `getDomainURL`.
-pub fn get_domain_url(url_str: &str) -> String {
+pub(crate) fn get_domain_url(url_str: &str) -> String {
     parse_http_url(url_str)
         .and_then(|u| u.host_str().map(str::to_string))
         .unwrap_or_default()
@@ -64,7 +64,7 @@ pub fn get_domain_url(url_str: &str) -> String {
 /// Returns empty string if the URL is not absolute.
 ///
 /// Port of `getBaseURL`.
-pub fn get_base_url(url_str: &str) -> String {
+pub(crate) fn get_base_url(url_str: &str) -> String {
     parse_http_url(url_str)
         .map(|u| format!("{}://{}", u.scheme(), u.host_str().unwrap_or("")))
         .unwrap_or_default()
@@ -74,7 +74,7 @@ pub fn get_base_url(url_str: &str) -> String {
 /// Returns `(url_string, is_valid)`.
 ///
 /// Port of `validateURL`.
-pub fn validate_url(url_str: &str, base_url: Option<&Url>) -> (String, bool) {
+pub(crate) fn validate_url(url_str: &str, base_url: Option<&Url>) -> (String, bool) {
     // Already absolute?
     if is_absolute_url(url_str) {
         return (url_str.to_string(), true);

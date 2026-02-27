@@ -5,6 +5,9 @@ use scraper::{Node, Selector};
 
 use super::Document;
 
+/// Maximum recursion depth for query traversals.
+const MAX_TREE_DEPTH: usize = 500;
+
 impl Document {
     /// Find the first element (in document order) within the subtree rooted at
     /// `root` that matches the given CSS selector string.
@@ -28,18 +31,19 @@ impl Document {
 
     /// Find the first element matching a pre-compiled selector (early termination).
     pub(crate) fn query_first_compiled(&self, root: NodeId, sel: &Selector) -> Option<NodeId> {
-        self.find_first_matching(root, sel)
+        self.find_first_matching(root, sel, 0)
     }
 
     /// Find all elements matching a pre-compiled selector. Exposed for hot-path callers
     /// in the selector module that reuse compiled selectors across documents.
     pub(crate) fn query_selector_all_compiled(&self, root: NodeId, sel: &Selector) -> Vec<NodeId> {
         let mut result = Vec::new();
-        self.collect_matching(root, sel, &mut result);
+        self.collect_matching(root, sel, &mut result, 0);
         result
     }
 
-    fn find_first_matching(&self, id: NodeId, sel: &Selector) -> Option<NodeId> {
+    fn find_first_matching(&self, id: NodeId, sel: &Selector, depth: usize) -> Option<NodeId> {
+        if depth >= MAX_TREE_DEPTH { return None; }
         let node_ref = self.tree.get(id)?;
         if let Some(elem_ref) = scraper::ElementRef::wrap(node_ref) {
             if sel.matches(&elem_ref) {
@@ -47,14 +51,15 @@ impl Document {
             }
         }
         for child in node_ref.children() {
-            if let Some(found) = self.find_first_matching(child.id(), sel) {
+            if let Some(found) = self.find_first_matching(child.id(), sel, depth + 1) {
                 return Some(found);
             }
         }
         None
     }
 
-    fn collect_matching(&self, id: NodeId, sel: &Selector, out: &mut Vec<NodeId>) {
+    fn collect_matching(&self, id: NodeId, sel: &Selector, out: &mut Vec<NodeId>, depth: usize) {
+        if depth >= MAX_TREE_DEPTH { return; }
         let Some(node_ref) = self.tree.get(id) else { return };
         if let Some(elem_ref) = scraper::ElementRef::wrap(node_ref) {
             if sel.matches(&elem_ref) {
@@ -62,7 +67,7 @@ impl Document {
             }
         }
         for child in node_ref.children() {
-            self.collect_matching(child.id(), sel, out);
+            self.collect_matching(child.id(), sel, out, depth + 1);
         }
     }
 
@@ -73,11 +78,12 @@ impl Document {
     /// Port of `dom.GetElementsByTagName`.
     pub fn get_elements_by_tag_name(&self, root: NodeId, tag: &str) -> Vec<NodeId> {
         let mut result = Vec::new();
-        self.collect_by_tag(root, tag, false, &mut result);
+        self.collect_by_tag(root, tag, false, &mut result, 0);
         result
     }
 
-    fn collect_by_tag(&self, id: NodeId, tag: &str, include_self: bool, out: &mut Vec<NodeId>) {
+    fn collect_by_tag(&self, id: NodeId, tag: &str, include_self: bool, out: &mut Vec<NodeId>, depth: usize) {
+        if depth >= MAX_TREE_DEPTH { return; }
         let Some(node) = self.tree.get(id) else { return };
 
         if let Node::Element(e) = node.value() {
@@ -88,7 +94,7 @@ impl Document {
         }
 
         for child in node.children() {
-            self.collect_by_tag(child.id(), tag, true, out);
+            self.collect_by_tag(child.id(), tag, true, out, depth + 1);
         }
     }
 

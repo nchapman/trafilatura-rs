@@ -1,9 +1,9 @@
 // Port of go-trafilatura/main-extractor.go (orchestration)
 
-pub mod baseline;
-pub mod elements;
-pub mod external;
-pub mod html_processing;
+pub(crate) mod baseline;
+pub(crate) mod elements;
+pub(crate) mod external;
+pub(crate) mod html_processing;
 
 use std::collections::HashSet;
 
@@ -28,7 +28,7 @@ use html_processing::{
 /// pass `doc.clone_document()`.
 ///
 /// Port of `pruneUnwantedSections`.
-pub fn prune_unwanted_sections(
+pub(crate) fn prune_unwanted_sections(
     doc: &Document,
     potential_tags: &HashSet<&str>,
     opts: &Options,
@@ -156,7 +156,7 @@ fn recover_wild_text(
 /// Returns the result body as a Document and the extracted text.
 ///
 /// Port of `extractContent`.
-pub fn extract_content(
+pub(crate) fn extract_content(
     doc: &Document,
     cache: &mut LruCache,
     opts: &Options,
@@ -295,7 +295,7 @@ pub fn extract_content(
 /// Processes a single node for comment extraction.
 ///
 /// Port of `processCommentsNode`.
-pub fn process_comments_node(
+pub(crate) fn process_comments_node(
     doc: &mut Document,
     id: NodeId,
     potential_tags: &HashSet<&str>,
@@ -309,7 +309,7 @@ pub fn process_comments_node(
     }
 
     // Process: dedup and filter check (fix_comments=true, preserve_spaces=false).
-    handle_text_node(doc, id, Some(cache), true, false, opts)?;
+    handle_text_node(doc, id, cache, true, false, opts)?;
 
     // Clear attributes.
     doc.clear_attributes(id);
@@ -323,7 +323,7 @@ pub fn process_comments_node(
 /// Returns the comments as a Document and the raw comment text, or `(None, "")` if none found.
 ///
 /// Port of `extractComments`.
-pub fn extract_comments(
+pub(crate) fn extract_comments(
     doc: &mut Document,
     cache: &mut LruCache,
     opts: &Options,

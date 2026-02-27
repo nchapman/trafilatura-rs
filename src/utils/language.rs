@@ -92,7 +92,7 @@ fn to_iso639_1(lang: Lang) -> &'static str {
 /// an empty ISO 639-1 code. The observable output is identical.
 ///
 /// Port of `languageClassifier`.
-pub fn language_classifier(content_text: &str, comments_text: &str) -> String {
+pub(crate) fn language_classifier(content_text: &str, comments_text: &str) -> String {
     let len_content = content_text.chars().count();
     let len_comments = comments_text.chars().count();
 

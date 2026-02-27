@@ -10,19 +10,17 @@ use trafilatura::result::ExtractResult;
 // ---------------------------------------------------------------------------
 
 fn zero_config() -> Config {
-    Config {
-        min_extracted_size: 0,
-        min_output_size: 0,
-        ..Default::default()
-    }
+    let mut c = Config::default();
+    c.min_extracted_size = 0;
+    c.min_output_size = 0;
+    c
 }
 
 fn zero_opts() -> Options {
-    Options {
-        config: zero_config(),
-        enable_fallback: true,
-        ..Default::default()
-    }
+    let mut o = Options::default();
+    o.config = zero_config();
+    o.enable_fallback = true;
+    o
 }
 
 fn extract(html: &str, opts: Options) -> Option<ExtractResult> {
@@ -47,9 +45,10 @@ fn read_simple_fixture(name: &str) -> String {
 /// package-private Go functions not accessible from integration tests.
 #[test]
 fn test_paywall_removal() {
-    let opts = Options {
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o
     };
     let html = r#"<html><body><main><p>1</p><p id="premium">2</p><p>3</p></main></body></html>"#;
     let result = extract(html, opts).expect("extraction should succeed");
@@ -77,9 +76,10 @@ fn test_exotic_misformed_html() {
 fn test_exotic_empty_blockquote() {
     let html =
         r#"<html><body><article><blockquote></blockquote></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
@@ -93,9 +93,10 @@ fn test_exotic_empty_blockquote() {
 #[test]
 fn test_exotic_empty_table() {
     let html = r#"<html><body><article><table></table></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
@@ -110,9 +111,10 @@ fn test_exotic_empty_table() {
 fn test_exotic_nested_p() {
     // HTML5 parsers split nested <p>; both parts should appear in extraction.
     let html = r#"<html><body><article><p>1st part. <p>2nd part.</p></p></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -131,9 +133,10 @@ fn test_exotic_nested_p() {
 #[test]
 fn test_exotic_details_summary() {
     let html = r#"<html><body><article><details><summary>Epcot Center</summary><p>Epcot is a theme park at Walt Disney World Resort featuring exciting attractions, international pavilions, award-winning fireworks and seasonal special events.</p></details></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -170,10 +173,11 @@ fn test_exotic_strong_empty_anchor() {
         </div>
     </body>
     </html>"#;
-    let opts = Options {
-        include_links: true,
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.include_images = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -211,11 +215,12 @@ fn test_exotic_em_wrapping_p() {
         ExtractionFocus::FavorRecall,
         ExtractionFocus::FavorPrecision,
     ] {
-        let opts = Options {
-            include_links: true,
-            include_images: true,
-            focus,
-            ..Default::default()
+        let opts = {
+            let mut o = Options::default();
+            o.include_links = true;
+            o.include_images = true;
+            o.focus = focus;
+            o
         };
         let result = extract(html, opts).expect("extraction should succeed");
         assert!(
@@ -239,9 +244,10 @@ fn test_exotic_em_wrapping_p() {
 #[test]
 fn test_images_excluded_by_default() {
     let html = read_simple_fixture("http_sample.html");
-    let opts = Options {
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(
@@ -254,10 +260,11 @@ fn test_images_excluded_by_default() {
 #[test]
 fn test_images_included_when_opted_in() {
     let html = read_simple_fixture("http_sample.html");
-    let opts = Options {
-        config: zero_config(),
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.include_images = true;
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     // The scraper serializer may reorder attributes and drop the XML self-closing slash.
@@ -272,10 +279,11 @@ fn test_images_included_when_opted_in() {
 #[test]
 fn test_images_data_src_promoted() {
     let html = r#"<html><body><article><p><img data-src="test.jpg" alt="text" title="a title"/></p></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.include_images = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     // data-src must be promoted to src; attribute order may vary.
@@ -290,10 +298,11 @@ fn test_images_data_src_promoted() {
 #[test]
 fn test_images_data_src_small_promoted() {
     let html = r#"<html><body><article><div><p><img data-src-small="test.jpg" alt="text" title="a title"/></p></div></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.include_images = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     // data-src-small must be promoted to src; attribute order may vary.
@@ -308,10 +317,11 @@ fn test_images_data_src_small_promoted() {
 #[test]
 fn test_images_no_valid_src_attr() {
     let html = r#"<html><body><article><p><img other="test.jpg" alt="text" title="a title"/></p></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.include_images = true;
+        o
     };
     let result = extract(html, opts);
     // Image-only content with no valid src → extraction returns nothing.
@@ -326,10 +336,11 @@ fn test_images_no_valid_src_attr() {
 #[test]
 fn test_images_data_uri_rejected() {
     let html = r#"<html><body><article><p><img src="data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==" alt="text"/></p></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.include_images = true;
+        o
     };
     let result = extract(html, opts);
     // data: URI images are rejected — result is empty (None or empty body).
@@ -344,10 +355,11 @@ fn test_images_data_uri_rejected() {
 #[test]
 fn test_images_nested_div_data_src() {
     let html = r#"<html><body><article><div><p><img data-src="test.jpg" alt="text" title="a title"/></p></div></article></body></html>"#;
-    let opts = Options {
-        config: zero_config(),
-        include_images: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.include_images = true;
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     // Attribute order may vary; verify src is promoted.
@@ -378,10 +390,11 @@ fn test_links_excluded_by_default() {
 #[test]
 fn test_links_included_when_opted_in() {
     let html = r#"<html><body><p><a href="testlink.html">Test link text.</a>This part of the text has to be long enough.</p></body></html>"#;
-    let opts = Options {
-        include_links: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -400,10 +413,11 @@ fn test_links_high_density_excluded_precision() {
         r#"<html><body><article><p><a>{}</a></p></article></body></html>"#,
         "abcd".repeat(20)
     );
-    let opts = Options {
-        config: zero_config(),
-        focus: ExtractionFocus::FavorPrecision,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.focus = ExtractionFocus::FavorPrecision;
+        o
     };
     let result = extract(&html, opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
@@ -420,10 +434,11 @@ fn test_links_high_density_included_balanced() {
         r#"<html><body><article><p><a>{}</a></p></article></body></html>"#,
         "abcd".repeat(20)
     );
-    let opts = Options {
-        config: zero_config(),
-        focus: ExtractionFocus::Balanced,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.config = zero_config();
+        o.focus = ExtractionFocus::Balanced;
+        o
     };
     let result = extract(&html, opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
@@ -437,10 +452,11 @@ fn test_links_high_density_included_balanced() {
 #[test]
 fn test_links_without_href() {
     let html = r#"<html><body><p><a>Test link text.</a>This part of the text has to be long enough.</p></body></html>"#;
-    let opts = Options {
-        include_links: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -454,10 +470,11 @@ fn test_links_without_href() {
 #[test]
 fn test_links_various_positions() {
     let html = r#"<html><body><article><a>Segment 1</a><h1><a>Segment 2</a></h1><p>Segment 3</p></article></body></html>"#;
-    let opts = Options {
-        include_links: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -488,10 +505,11 @@ fn test_links_from_fixture() {
         "testlink.html should not appear when include_links=false"
     );
 
-    let opts_with_links = Options {
-        include_links: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts_with_links = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = zero_config();
+        o
     };
     let result_with_links =
         extract(&html, opts_with_links).expect("extraction should succeed");
@@ -506,10 +524,11 @@ fn test_links_from_fixture() {
 #[test]
 fn test_links_license_rel_stripped() {
     let html = r#"<html><body><p>Test text under <a rel="license" href="">CC BY-SA license</a>.</p></body></html>"#;
-    let opts = Options {
-        include_links: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = zero_config();
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -525,11 +544,12 @@ fn test_links_relative_url_conversion() {
     let html = r#"<html><body><p><a href="testlink.html">Test link text.</a>This part of the text has to be long enough.</p></body></html>"#;
     let original_url =
         url::Url::parse("https://www.example.com").expect("valid URL");
-    let opts = Options {
-        include_links: true,
-        config: zero_config(),
-        original_url: Some(original_url),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = zero_config();
+        o.original_url = Some(original_url);
+        o
     };
     let result = extract(html, opts).expect("extraction should succeed");
     assert!(
@@ -546,12 +566,11 @@ fn test_links_relative_url_conversion() {
 // ---------------------------------------------------------------------------
 
 fn prune_opts(selector: &str) -> Options {
-    Options {
-        config: zero_config(),
-        enable_fallback: true,
-        prune_selector: Some(selector.to_string()),
-        ..Default::default()
-    }
+    let mut o = Options::default();
+    o.config = zero_config();
+    o.enable_fallback = true;
+    o.prune_selector = Some(selector.to_string());
+    o
 }
 
 /// 50 `<p>abc</p>` elements with PruneSelector="p" → empty.
@@ -626,9 +645,10 @@ fn test_prune_selector_p_and_h1_keeps_h2() {
 #[test]
 fn test_external_exclude_tables_false() {
     let html = read_simple_fixture("apache.html");
-    let opts = Options {
-        exclude_tables: false,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.exclude_tables = false;
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(
@@ -642,9 +662,10 @@ fn test_external_exclude_tables_false() {
 #[test]
 fn test_external_exclude_tables_true() {
     let html = read_simple_fixture("apache.html");
-    let opts = Options {
-        exclude_tables: true,
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.exclude_tables = true;
+        o
     };
     let result = extract(&html, opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
@@ -658,10 +679,11 @@ fn test_external_exclude_tables_true() {
 #[test]
 fn test_external_scam_no_fallback_empty() {
     let html = read_simple_fixture("scam.html");
-    let opts = Options {
-        exclude_tables: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.exclude_tables = true;
+        o.config = zero_config();
+        o
     };
     let result = extract(&html, opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
@@ -681,11 +703,12 @@ fn test_external_scam_no_fallback_empty() {
 #[test]
 fn test_external_scam_with_fallback_nonempty() {
     let html = read_simple_fixture("scam.html");
-    let opts = Options {
-        exclude_tables: true,
-        enable_fallback: true,
-        config: zero_config(),
-        ..Default::default()
+    let opts = {
+        let mut o = Options::default();
+        o.exclude_tables = true;
+        o.enable_fallback = true;
+        o.config = zero_config();
+        o
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(

@@ -5,7 +5,7 @@ use crate::selector::utils::{contains, lower, starts_with};
 
 /// Ordered list of content extraction rules.
 /// Applied in sequence; the first match wins.
-pub const CONTENT: &[super::Rule] = &[
+pub(crate) const CONTENT: &[super::Rule] = &[
     content_rule1,
     content_rule2,
     content_rule3,

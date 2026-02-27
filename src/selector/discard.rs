@@ -8,7 +8,7 @@ use crate::selector::utils::{contains, lower, starts_with};
 /// Rules that discard common boilerplate: footers, nav, sidebars, ads, etc.
 ///
 /// Port of `OverallDiscardedContent`.
-pub const OVERALL_DISCARDED_CONTENT: &[super::Rule] = &[
+pub(crate) const OVERALL_DISCARDED_CONTENT: &[super::Rule] = &[
     overall_discarded_content_rule1,
     overall_discarded_content_rule2,
 ];
@@ -16,7 +16,7 @@ pub const OVERALL_DISCARDED_CONTENT: &[super::Rule] = &[
 /// Rules that discard elements in precision mode: headers and link/border containers.
 ///
 /// Port of `PrecisionDiscardedContent`.
-pub const PRECISION_DISCARDED_CONTENT: &[super::Rule] = &[
+pub(crate) const PRECISION_DISCARDED_CONTENT: &[super::Rule] = &[
     precision_discarded_content_rule1,
     precision_discarded_content_rule2,
 ];
@@ -24,7 +24,7 @@ pub const PRECISION_DISCARDED_CONTENT: &[super::Rule] = &[
 /// Rules that discard comment-adjacent noise (reply forms, hidden elements, etc.).
 ///
 /// Port of `DiscardedComments`.
-pub const DISCARDED_COMMENTS: &[super::Rule] = &[
+pub(crate) const DISCARDED_COMMENTS: &[super::Rule] = &[
     discarded_comments_rule1,
     discarded_comments_rule2,
     discarded_comments_rule3,
@@ -33,17 +33,17 @@ pub const DISCARDED_COMMENTS: &[super::Rule] = &[
 /// Rules that remove full comment thread sections.
 ///
 /// Port of `RemovedComments`.
-pub const REMOVED_COMMENTS: &[super::Rule] = &[removed_comments_rule1];
+pub(crate) const REMOVED_COMMENTS: &[super::Rule] = &[removed_comments_rule1];
 
 /// Rules that discard image caption containers.
 ///
 /// Port of `DiscardedImage`.
-pub const DISCARDED_IMAGE: &[super::Rule] = &[discarded_image_rule1];
+pub(crate) const DISCARDED_IMAGE: &[super::Rule] = &[discarded_image_rule1];
 
 /// Rules that discard teaser/preview elements.
 ///
 /// Port of `DiscardedTeaser`.
-pub const DISCARDED_TEASER: &[super::Rule] = &[discarded_teaser_rule1];
+pub(crate) const DISCARDED_TEASER: &[super::Rule] = &[discarded_teaser_rule1];
 
 // ---------------------------------------------------------------------------
 // OverallDiscardedContent rules

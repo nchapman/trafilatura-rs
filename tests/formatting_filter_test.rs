@@ -7,16 +7,14 @@ use trafilatura::utils::language::check_html_language;
 
 /// Equivalent to Go's `zeroOpts`: enable_fallback + zero min sizes.
 fn zero_opts() -> Options {
-    Options {
-        enable_fallback: true,
-        original_url: Some(url::Url::parse("https://example.org").unwrap()),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
-    }
+    let mut c = Config::default();
+    c.min_extracted_size = 0;
+    c.min_output_size = 0;
+    let mut o = Options::default();
+    o.enable_fallback = true;
+    o.original_url = Some(url::Url::parse("https://example.org").unwrap());
+    o.config = c;
+    o
 }
 
 /// Wraps a body fragment into a minimal HTML document.
@@ -242,14 +240,14 @@ fn test_formatting_list_with_links() {
     let html = html_doc(
         r#"<article><ul><li>Number 1</li><li>Number <a href="test.html">2</a></li><li>Number 3</li><p>Test</p></article>"#,
     );
-    let opts = Options {
-        include_links: true,
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = c;
+        o
     };
     let content_html = extract_html(&html, opts).unwrap_or_default();
     assert!(
@@ -269,14 +267,14 @@ fn test_formatting_list_with_links() {
 #[test]
 fn test_formatting_within_p_no_links() {
     let raw_html = html_doc(r#"<p><b>bold</b>, <i>italics</i>, <tt>tt</tt>, <strike>deleted</strike>, <u>underlined</u>, <a href="test.html">link</a> and additional text to bypass detection.</p>"#);
-    let opts = Options {
-        include_links: false,
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.include_links = false;
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&raw_html, opts).expect("extraction should succeed");
     // All words must be present in content_text (even if punctuation spacing differs).
@@ -312,14 +310,14 @@ fn test_formatting_within_p_no_links() {
 #[test]
 fn test_formatting_within_p_with_links() {
     let raw_html = html_doc(r#"<p><b>bold</b>, <i>italics</i>, <tt>tt</tt>, <strike>deleted</strike>, <u>underlined</u>, <a href="test.html">link</a> and additional text to bypass detection.</p>"#);
-    let opts = Options {
-        include_links: true,
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = c;
+        o
     };
     let content_html = extract_html(&raw_html, opts).unwrap_or_default();
     assert!(
@@ -394,14 +392,14 @@ fn test_formatting_title_with_code() {
 #[test]
 fn test_formatting_double_p_contains_all_text() {
     let html = html_doc("<p>AAA, <p>BBB</p>, CCC.</p>");
-    let opts = Options {
-        include_links: true,
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.include_links = true;
+        o.config = c;
+        o
     };
     let text = extract_text(&html, opts).unwrap_or_default();
     assert!(text.contains("AAA"), "should contain 'AAA'");
@@ -418,14 +416,14 @@ fn test_formatting_double_p_contains_all_text() {
 fn test_filters_max_tree_size_50_p_passes() {
     let body: String = "<p>abc</p>".repeat(50);
     let html = format!("<html><body>{body}</body></html>");
-    let opts = Options {
-        max_tree_size: Some(500),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.max_tree_size = Some(500);
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(result.is_ok(), "50 paragraphs should pass MaxTreeSize=500");
@@ -436,14 +434,14 @@ fn test_filters_max_tree_size_50_p_passes() {
 fn test_filters_max_tree_size_501_p_fails() {
     let body: String = "<p>abc</p>".repeat(501);
     let html = format!("<html><body>{body}</body></html>");
-    let opts = Options {
-        max_tree_size: Some(500),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.max_tree_size = Some(500);
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -459,14 +457,14 @@ fn test_filters_max_tree_size_501_p_fails() {
 fn test_filters_max_tree_size_501_p_italic_fails() {
     let body: String = "<p><i>abc</i></p>".repeat(501);
     let html = format!("<html><body>{body}</body></html>");
-    let opts = Options {
-        max_tree_size: Some(500),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.max_tree_size = Some(500);
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -480,14 +478,14 @@ fn test_filters_max_tree_size_501_p_italic_fails() {
 fn test_filters_max_tree_size_499_p_italic_passes() {
     let body: String = "<p><i>abc</i></p>".repeat(499);
     let html = format!("<html><body>{body}</body></html>");
-    let opts = Options {
-        max_tree_size: Some(500),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.max_tree_size = Some(500);
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -504,9 +502,10 @@ fn test_filters_max_tree_size_499_p_italic_passes() {
 #[test]
 fn test_filters_check_html_lang_no_lang_passes() {
     let doc = Document::parse("<html><body></body></html>");
-    let opts = Options {
-        target_language: Some("en".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("en".to_string());
+        o
     };
     assert!(
         check_html_language(&doc, &opts, false),
@@ -519,14 +518,14 @@ fn test_filters_check_html_lang_no_lang_passes() {
 fn test_filters_lang_detection_english_content_target_de() {
     let text = "How many ages hence/Shall this our lofty scene be acted over,/In states unborn and accents yet unknown!";
     let html = format!("<html><body><article><p>{text}</p></article></body></html>");
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -540,14 +539,14 @@ fn test_filters_lang_detection_english_content_target_de() {
 fn test_filters_lang_detection_english_content_target_en() {
     let text = "How many ages hence/Shall this our lofty scene be acted over,/In states unborn and accents yet unknown!";
     let html = format!("<html><body><article><p>{text}</p></article></body></html>");
-    let opts = Options {
-        target_language: Some("en".to_string()),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.target_language = Some("en".to_string());
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -562,14 +561,14 @@ fn test_filters_lang_english_html_lang_target_de_blocked() {
     let p3 = "<p>Thus have I had thee as a dream doth flatter, In sleep a king, but waking no such matter.</p>";
     let body: String = p3.repeat(50);
     let html = format!("<html lang=\"en-US\"><body>{body}</body></html>");
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -584,14 +583,14 @@ fn test_filters_lang_english_html_lang_target_en_passes() {
     let p3 = "<p>Thus have I had thee as a dream doth flatter, In sleep a king, but waking no such matter.</p>";
     let body: String = p3.repeat(50);
     let html = format!("<html lang=\"en-US\"><body>{body}</body></html>");
-    let opts = Options {
-        target_language: Some("en".to_string()),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.target_language = Some("en".to_string());
+        o.config = c;
+        o
     };
     let result = trafilatura::extract(&html, opts);
     assert!(
@@ -606,14 +605,14 @@ fn test_filters_lang_de_html_lang_but_english_content_target_de() {
     let p3 = "<p>Thus have I had thee as a dream doth flatter, In sleep a king, but waking no such matter.</p>";
     let body: String = p3.repeat(50);
     let html = format!("<html lang=\"de-DE\"><body>{body}</body></html>");
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        config: Config {
-            min_extracted_size: 0,
-            min_output_size: 0,
-            ..Config::default()
-        },
-        ..Options::default()
+    let opts = {
+        let mut c = Config::default();
+        c.min_extracted_size = 0;
+        c.min_output_size = 0;
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o.config = c;
+        o
     };
     // The html[lang] attribute says "de" but the actual content is English.
     // In non-strict mode, html[lang] is not checked at the early stage, so extraction
@@ -631,9 +630,10 @@ fn test_filters_check_html_lang_http_equiv_en_target_en() {
     let doc = Document::parse(
         r#"<html><head><meta http-equiv="content-language" content="en"></head><body></body></html>"#,
     );
-    let opts = Options {
-        target_language: Some("en".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("en".to_string());
+        o
     };
     assert!(
         check_html_language(&doc, &opts, false),
@@ -647,9 +647,10 @@ fn test_filters_check_html_lang_http_equiv_en_target_de() {
     let doc = Document::parse(
         r#"<html><head><meta http-equiv="content-language" content="en"></head><body></body></html>"#,
     );
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o
     };
     assert!(
         !check_html_language(&doc, &opts, false),
@@ -663,9 +664,10 @@ fn test_filters_check_html_lang_http_equiv_de_uppercase_target_de() {
     let doc = Document::parse(
         r#"<html><head><meta http-equiv="content-language" content="DE"></head><body></body></html>"#,
     );
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o
     };
     assert!(
         check_html_language(&doc, &opts, false),
@@ -679,9 +681,10 @@ fn test_filters_check_html_lang_og_locale_de_target_de() {
     let doc = Document::parse(
         r#"<html lang="en-US"><head><meta property="og:locale" content="de_DE" /></head><body></body></html>"#,
     );
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o
     };
     assert!(
         check_html_language(&doc, &opts, false),
@@ -695,9 +698,10 @@ fn test_filters_check_html_lang_og_locale_de_target_en() {
     let doc = Document::parse(
         r#"<html lang="en-US"><head><meta property="og:locale" content="de_DE" /></head><body></body></html>"#,
     );
-    let opts = Options {
-        target_language: Some("en".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("en".to_string());
+        o
     };
     assert!(
         !check_html_language(&doc, &opts, false),
@@ -709,9 +713,10 @@ fn test_filters_check_html_lang_og_locale_de_target_en() {
 #[test]
 fn test_filters_check_html_lang_multi_lang_target_de() {
     let doc = Document::parse(r#"<html lang="de_DE, en_US"><body></body></html>"#);
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o
     };
     assert!(
         check_html_language(&doc, &opts, false),
@@ -727,9 +732,10 @@ fn test_filters_check_html_lang_multi_lang_target_de() {
 #[test]
 fn test_filters_check_html_lang_multi_lang_target_en() {
     let doc = Document::parse(r#"<html lang="de_DE, en_US"><body></body></html>"#);
-    let opts = Options {
-        target_language: Some("en".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("en".to_string());
+        o
     };
     assert!(
         check_html_language(&doc, &opts, false),
@@ -745,9 +751,10 @@ fn test_filters_check_html_lang_multi_lang_target_en() {
 #[test]
 fn test_filters_check_html_lang_strict_mode_blocks_mismatch() {
     let doc = Document::parse(r#"<html lang="en"><body></body></html>"#);
-    let opts = Options {
-        target_language: Some("it".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("it".to_string());
+        o
     };
     assert!(
         !check_html_language(&doc, &opts, true),
@@ -765,9 +772,10 @@ fn test_filters_check_html_lang_strict_og_locale_overrides_html_lang() {
     let doc = Document::parse(
         r#"<html lang="en-US"><head><meta property="og:locale" content="de_DE" /></head><body></body></html>"#,
     );
-    let opts = Options {
-        target_language: Some("de".to_string()),
-        ..Options::default()
+    let opts = {
+        let mut o = Options::default();
+        o.target_language = Some("de".to_string());
+        o
     };
     // og:locale is checked first; matches "de" → true regardless of strict flag.
     assert!(

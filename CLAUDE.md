@@ -6,7 +6,7 @@ Rust port of [trafilatura](https://github.com/adbar/trafilatura), a web content 
 
 - **Go source** (port from this): `/Users/nchapman/Code/go-trafilatura`
 - **Python source** (behavioral reference): `/Users/nchapman/Code/trafilatura`
-- **Implementation plan**: `PLAN.md` in this repo
+
 
 When porting a function, always read the Go source first. When behavior is unclear, check the Python original.
 

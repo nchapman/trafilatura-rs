@@ -11,7 +11,7 @@ use regex::Regex;
 
 /// Matches social media sharing / print lines that should be filtered out.
 /// Port of the re2c source pattern for `IsTextFilter`.
-pub static TEXT_FILTER: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static TEXT_FILTER: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)\W*(Drucken|E-?Mail|Facebook|Flipboard|Google|Instagram|Linkedin|Mail|PDF|Pinterest|Pocket|Print|QQ|Reddit|Twitter|WeChat|WeiBo|Whatsapp|Xing|Mehr zum Thema:?|More on this.{0,8})$"
     ).unwrap()
@@ -22,7 +22,7 @@ pub static TEXT_FILTER: LazyLock<Regex> = LazyLock::new(|| {
 // ---------------------------------------------------------------------------
 
 /// Matches 2-letter language codes (e.g. "en", "de").
-pub static HTML_LANG: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static HTML_LANG: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)[a-z]{2}").unwrap()
 });
 
@@ -31,57 +31,57 @@ pub static HTML_LANG: LazyLock<Regex> = LazyLock::new(|| {
 // ---------------------------------------------------------------------------
 
 /// Splits author lists on commas or semicolons.
-pub static COMMA_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static COMMA_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\s*[,;]\s*").unwrap()
 });
 
 /// Strips site name suffixes from titles (e.g. "Article – Site Name").
-pub static TITLE_CLEANER: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static TITLE_CLEANER: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^(.+)?\s+[–•·—|⁄*⋆~‹«<›»>:-]\s+(.+)$").unwrap()
 });
 
 /// Detects JSON-like curly braces and backslashes (used to detect non-name strings).
-pub static JSON_SYMBOL: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static JSON_SYMBOL: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"[{\\}]"#).unwrap()
 });
 
 /// Extracts a "name" value from a JSON-LD fragment.
-pub static NAME_JSON: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static NAME_JSON: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)"name\\?":\s*\\?"([^"\\]+)"#).unwrap()
 });
 
 /// Checks if a string contains an HTTP(S) URL prefix.
-pub static URL_CHECK: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static URL_CHECK: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)https?://").unwrap()
 });
 
 /// Extracts the site name from a URL (between the protocol and first path segment).
-pub static SITENAME_FINDER: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static SITENAME_FINDER: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)https?://(?:www\.|w[0-9]+\.)?([^/]+)").unwrap()
 });
 
 /// Strips HTML tags and comments from a string.
-pub static HTML_STRIP_TAG: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static HTML_STRIP_TAG: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(<!--.*?-->|<[^>]*>)").unwrap()
 });
 
 /// Identifies category URLs by path segment.
-pub static CATEGORY_HREF: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static CATEGORY_HREF: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)/categor(?:y|ies)/").unwrap()
 });
 
 /// Identifies tag URLs by path segment.
-pub static TAG_HREF: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static TAG_HREF: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)/tags?/").unwrap()
 });
 
 /// Extracts Creative Commons license type and version from a URL path.
-pub static CC_LICENSE: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static CC_LICENSE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)/(by-nc-nd|by-nc-sa|by-nc|by-nd|by-sa|by|zero)/([1-9]\.[0-9])").unwrap()
 });
 
 /// Detects Creative Commons license references in text.
-pub static CC_LICENSE_TEXT: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static CC_LICENSE_TEXT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(cc|creative commons) (by-nc-nd|by-nc-sa|by-nc|by-nd|by-sa|by|zero) ?([1-9]\.[0-9])?").unwrap()
 });
 
@@ -90,52 +90,52 @@ pub static CC_LICENSE_TEXT: LazyLock<Regex> = LazyLock::new(|| {
 // ---------------------------------------------------------------------------
 
 /// Removes "by", "written by", "von", "from" prefixes from author strings.
-pub static AUTHOR_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^([a-zäöüß]+(ed|t))? ?(written by|words by|words|by|von|from) ").unwrap()
 });
 
 /// Removes digits and trailing text when they appear in author names.
-pub static AUTHOR_DIGITS: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_DIGITS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\p{N}.+?$").unwrap()
 });
 
 /// Removes social media handles (@username) from author strings.
-pub static AUTHOR_SOCIAL_MEDIA: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_SOCIAL_MEDIA: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)@\S+").unwrap()
 });
 
 /// Replaces dots, underscores, and plus signs with spaces in author strings.
-pub static AUTHOR_SPACE_CHARS: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_SPACE_CHARS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)[._+]").unwrap()
 });
 
 /// Removes nicknames in quotes/parentheses from author strings.
-pub static AUTHOR_NICKNAME: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_NICKNAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)["'({\['\'][^"]+?[''"'\)\]}]"#).unwrap()
 });
 
 /// Removes trailing special characters from author names.
-pub static AUTHOR_SPECIAL_CHARS: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_SPECIAL_CHARS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)[^\p{L}\p{M}\p{N}_]+$|[:()?*$#!%/<>{}~¿]").unwrap()
 });
 
 /// Removes prepositions and trailing location text from author names.
-pub static AUTHOR_PREPOSITION: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_PREPOSITION: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b\s+(am|on|for|at|in|to|from|of|via|with|—|-|–)\s+(.*)").unwrap()
 });
 
 /// Detects email addresses embedded in author strings.
-pub static AUTHOR_EMAIL: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_EMAIL: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b").unwrap()
 });
 
 /// Splits multiple authors on various separators.
-pub static AUTHOR_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)/|;|,|\||&|(?:^|[^\p{L}\p{M}\p{N}_])[ua]nd(?:$|[^\p{L}\p{M}\p{N}_])").unwrap()
 });
 
 /// Strips HTML tags from author strings.
-pub static AUTHOR_HTML: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static AUTHOR_HTML: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)<[^>]+>").unwrap()
 });
 

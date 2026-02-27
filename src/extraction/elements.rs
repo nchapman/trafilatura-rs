@@ -14,6 +14,9 @@ use crate::utils::{is_image_file, trim};
 
 use super::html_processing::{handle_text_node, process_node};
 
+/// Maximum nesting depth for mutually recursive list handlers.
+const MAX_LIST_DEPTH: usize = 100;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -31,7 +34,7 @@ fn escape_attr(s: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// Port of `handleTitles`.
-pub fn handle_titles(
+pub(crate) fn handle_titles(
     doc: &mut Document,
     id: NodeId,
     cache: &mut LruCache,
@@ -48,7 +51,7 @@ pub fn handle_titles(
 
     let title_valid = if children.is_empty() {
         // No children: process the node (filter/dedup check).
-        process_node(doc, id, Some(cache), opts).is_some()
+        process_node(doc, id, cache, opts).is_some()
     } else {
         // Has children: call handleTextNode on each child.
         // Go always appends something for every child — either the processed version
@@ -58,7 +61,7 @@ pub fn handle_titles(
         for &child_id in &children {
             let saved_text = doc.text(child_id);
             let saved_tail = doc.tail(child_id);
-            let result = handle_text_node(doc, child_id, Some(cache), false, false, opts);
+            let result = handle_text_node(doc, child_id, cache, false, false, opts);
             if result.is_none() {
                 // Child was discarded: restore original text and tail so that
                 // inner_html still includes whatever the original element contributed
@@ -101,14 +104,14 @@ pub fn handle_titles(
 /// Port of `handleFormatting`.
 ///
 /// Handles formatting elements (b, i, em, etc.) found outside of paragraphs.
-pub fn handle_formatting(
+pub(crate) fn handle_formatting(
     doc: &mut Document,
     id: NodeId,
     cache: &mut LruCache,
     opts: &Options,
 ) -> Option<String> {
     let has_children = !doc.children(id).is_empty();
-    let processed = process_node(doc, id, Some(cache), opts);
+    let processed = process_node(doc, id, cache, opts);
 
     if !has_children && processed.is_none() {
         return None;
@@ -153,6 +156,7 @@ fn process_nested_element(
     child_id: NodeId,
     cache: &mut LruCache,
     opts: &Options,
+    depth: usize,
 ) -> String {
     let mut inner = doc.text(child_id);
 
@@ -165,11 +169,11 @@ fn process_nested_element(
 
         if XML_LIST_TAGS.contains(sub_tag.as_str()) {
             // Nested list — recurse.
-            if let Some(nested_html) = handle_lists(doc, sub_id, cache, opts) {
+            if let Some(nested_html) = handle_lists_inner(doc, sub_id, cache, opts, depth + 1) {
                 inner.push_str(&nested_html);
             }
         } else {
-            let processed = handle_text_node(doc, sub_id, Some(cache), false, false, opts);
+            let processed = handle_text_node(doc, sub_id, cache, false, false, opts);
             if processed.is_some() {
                 let sub_text = doc.text(sub_id);
                 let tail = trim(&doc.tail(sub_id));
@@ -210,12 +214,23 @@ fn process_nested_element(
 }
 
 /// Port of `handleLists`.
-pub fn handle_lists(
+pub(crate) fn handle_lists(
     doc: &mut Document,
     id: NodeId,
     cache: &mut LruCache,
     opts: &Options,
 ) -> Option<String> {
+    handle_lists_inner(doc, id, cache, opts, 0)
+}
+
+fn handle_lists_inner(
+    doc: &mut Document,
+    id: NodeId,
+    cache: &mut LruCache,
+    opts: &Options,
+    depth: usize,
+) -> Option<String> {
+    if depth >= MAX_LIST_DEPTH { return None; }
     let tag = doc.tag_name(id).to_string();
     let mut items: Vec<String> = Vec::new();
 
@@ -235,7 +250,7 @@ pub fn handle_lists(
 
         let item_inner = if doc.children(desc_id).is_empty() {
             // No children: process the node directly.
-            let processed = process_node(doc, desc_id, Some(cache), opts);
+            let processed = process_node(doc, desc_id, cache, opts);
             if processed.is_none() {
                 doc.set_tag_name(desc_id, "done");
                 continue;
@@ -254,7 +269,7 @@ pub fn handle_lists(
             content
         } else {
             // Has children: build inner content recursively.
-            process_nested_element(doc, desc_id, cache, opts)
+            process_nested_element(doc, desc_id, cache, opts, depth)
         };
 
         if !item_inner.is_empty() {
@@ -282,7 +297,7 @@ pub fn handle_lists(
 // ---------------------------------------------------------------------------
 
 /// Port of `isCodeBlockElement`.
-pub fn is_code_block_element(doc: &Document, id: NodeId) -> bool {
+pub(crate) fn is_code_block_element(doc: &Document, id: NodeId) -> bool {
     // Pip: lang attr or code tag.
     if doc.get_attribute(id, "lang").is_some() || doc.tag_name(id) == "code" {
         return true;
@@ -310,7 +325,7 @@ pub fn is_code_block_element(doc: &Document, id: NodeId) -> bool {
 /// from all nodes in the clone.  We replicate this by clearing attributes on
 /// all descendants in-place, serializing with `inner_html`, then marking
 /// descendants as "done".
-pub fn handle_code_blocks(doc: &mut Document, id: NodeId) -> Option<String> {
+pub(crate) fn handle_code_blocks(doc: &mut Document, id: NodeId) -> Option<String> {
     if doc.iter_text(id, "").is_empty() {
         return None;
     }
@@ -336,7 +351,7 @@ pub fn handle_code_blocks(doc: &mut Document, id: NodeId) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 /// Port of `handleQuotes`.
-pub fn handle_quotes(
+pub(crate) fn handle_quotes(
     doc: &mut Document,
     id: NodeId,
     cache: &mut LruCache,
@@ -353,7 +368,7 @@ pub fn handle_quotes(
     let descendants = doc.get_elements_by_tag_name(id, "*");
     for &child_id in &descendants {
         if doc.tag_name(child_id) != "done" {
-            let _ = process_node(doc, child_id, Some(cache), opts);
+            let _ = process_node(doc, child_id, cache, opts);
         }
     }
 
@@ -387,7 +402,7 @@ pub fn handle_quotes(
 /// Port of `handleImage`.
 ///
 /// Returns processed image HTML, or None if the image src is invalid.
-pub fn handle_image(doc: &Document, id: NodeId) -> Option<String> {
+pub(crate) fn handle_image(doc: &Document, id: NodeId) -> Option<String> {
     let tag = doc.tag_name(id).to_string();
 
     // Determine the best src attribute.
@@ -495,7 +510,7 @@ fn transform_image_in_place(doc: &mut Document, id: NodeId) {
 // ---------------------------------------------------------------------------
 
 /// Port of `handleOtherElements`.
-pub fn handle_other_elements(
+pub(crate) fn handle_other_elements(
     doc: &mut Document,
     id: NodeId,
     potential_tags: &HashSet<&str>,
@@ -519,7 +534,7 @@ pub fn handle_other_elements(
 
     // div and details: handle as paragraphs-light.
     if tag == "div" || tag == "details" {
-        let processed = handle_text_node(doc, id, Some(cache), false, true, opts);
+        let processed = handle_text_node(doc, id, cache, false, true, opts);
         if processed.is_some() {
             let text = trim(&doc.text(id));
             if text_chars_test(&text) {
@@ -539,7 +554,7 @@ pub fn handle_other_elements(
 // ---------------------------------------------------------------------------
 
 /// Port of `handleParagraphs`.
-pub fn handle_paragraphs(
+pub(crate) fn handle_paragraphs(
     doc: &mut Document,
     id: NodeId,
     potential_tags: &HashSet<&str>,
@@ -553,7 +568,7 @@ pub fn handle_paragraphs(
 
     // Simple case: no children.
     if children.is_empty() {
-        process_node(doc, id, Some(cache), opts)?;
+        process_node(doc, id, cache, opts)?;
         let text = trim(&doc.iter_text(id, ""));
         if text.is_empty() {
             return None;
@@ -586,7 +601,7 @@ pub fn handle_paragraphs(
             continue;
         }
 
-        let processed = handle_text_node(doc, child_id, Some(cache), false, true, opts);
+        let processed = handle_text_node(doc, child_id, cache, false, true, opts);
         if processed.is_none() {
             doc.set_tag_name(child_id, "done");
             continue;
@@ -703,7 +718,7 @@ pub fn handle_paragraphs(
 // ---------------------------------------------------------------------------
 
 /// Port of `handleTable`.
-pub fn handle_table(
+pub(crate) fn handle_table(
     doc: &mut Document,
     id: NodeId,
     potential_tags: &HashSet<&str>,
@@ -769,7 +784,7 @@ fn build_cell_content(
 
     if children.is_empty() {
         // Childless cell: processNode.
-        process_node(doc, cell_id, Some(cache), opts)?;
+        process_node(doc, cell_id, cache, opts)?;
         let text = trim(&doc.text(cell_id));
         let tail = trim(&doc.tail(cell_id));
         let content = if !text.is_empty() && !tail.is_empty() {
@@ -796,7 +811,7 @@ fn build_cell_content(
 
         let sub_html =
             if XML_CELL_TAGS.contains(child_tag.as_str()) || XML_HI_TAGS.contains(child_tag.as_str()) {
-                let processed = handle_text_node(doc, child_id, Some(cache), true, false, opts);
+                let processed = handle_text_node(doc, child_id, cache, true, false, opts);
                 if processed.is_some() {
                     let text = trim(&doc.text(child_id));
                     let tail = trim(&doc.tail(child_id));
@@ -843,7 +858,7 @@ fn build_cell_content(
 /// Port of `handleTextElem`.
 ///
 /// Dispatches to the appropriate handler based on the element's tag name.
-pub fn handle_text_elem(
+pub(crate) fn handle_text_elem(
     doc: &mut Document,
     id: NodeId,
     potential_tags: &HashSet<&str>,
@@ -863,7 +878,7 @@ pub fn handle_text_elem(
     } else if XML_LB_TAGS.contains(tag.as_str()) {
         // Line break: if tail has text content, promote it to a <p>.
         let tail = trim(&doc.tail(id));
-        if text_chars_test(&tail) && process_node(doc, id, Some(cache), opts).is_some() {
+        if text_chars_test(&tail) && process_node(doc, id, cache, opts).is_some() {
             let tail_text = trim(&doc.tail(id));
             if !tail_text.is_empty() {
                 return Some(format!("<p>{tail_text}</p>"));

@@ -3,6 +3,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum TrafilaturaError {
     #[error("failed to parse HTML: {0}")]
     ParseError(String),

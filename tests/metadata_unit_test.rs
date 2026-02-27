@@ -150,70 +150,8 @@ fn test_metadata_titles() {
 }
 
 // ---------------------------------------------------------------------------
-// Test_Metadata_normalizeAuthors — tested through public extract_metadata
+// Test_Metadata_normalizeAuthors — moved to src/metadata/mod.rs (pub(crate) function)
 // ---------------------------------------------------------------------------
-
-/// Tests normalize_authors behavior through meta author extraction.
-///
-/// Since normalize_authors is not public, we test via meta tags.
-/// Each case uses a `<meta itemprop="author" content="..."/>` to feed input
-/// and checks that the extracted author matches the expected normalized form.
-#[test]
-fn test_metadata_normalize_authors() {
-    // "abc" → "Abc" (title-cased)
-    // normalize_authors("", "abc") == "Abc"
-    // Single-word names with no space: rejected by validate_metadata_name.
-    // Actually looking at the Go test: na("", "abc") == "Abc"
-    // But validate_metadata_name requires a space. Let's check by running:
-    // "abc" has no space → validate_metadata_name returns "".
-    // This means normalize_authors("", "abc") would return "Abc" but
-    // validate_metadata_name would clear it.
-    // In Go, normalizeAuthors is tested directly (not through extractMetadata).
-    // In Rust, normalize_authors is pub, so we can call it:
-    use trafilatura::metadata::normalize_authors;
-
-    assert_eq!("Abc", normalize_authors("", "abc"));
-    assert_eq!("Steve Steve", normalize_authors("", "Steve Steve 123"));
-    assert_eq!("Steve Steve", normalize_authors("", "By Steve Steve"));
-    assert_eq!(
-        "Seán Federico O'Murchú",
-        normalize_authors("", "Seán Federico O'Murchú")
-    );
-    assert_eq!("John Doe", normalize_authors("", "John Doe"));
-    assert_eq!(
-        "Alice; Bob; John Doe",
-        normalize_authors("Alice; Bob", "John Doe")
-    );
-    // Email should be skipped → return existing authors unchanged
-    assert_eq!(
-        "Alice; Bob",
-        normalize_authors("Alice; Bob", "john.doe@example.com")
-    );
-    // Unicode entity: \u00e9 = é → "Étienne"
-    assert_eq!("Étienne", normalize_authors("", "\u{00e9}tienne"));
-    // HTML entity: &#233; = é → "Étienne"
-    assert_eq!("Étienne", normalize_authors("", "&#233;tienne"));
-    // &amp; separator → "Alice; Bob"
-    assert_eq!("Alice; Bob", normalize_authors("", "Alice &amp; Bob"));
-    // Strip HTML tags
-    assert_eq!("John Doe", normalize_authors("", "<b>John Doe</b>"));
-    // Remove emoji
-    assert_eq!("John Doe", normalize_authors("", "John 😊 Doe"));
-    // Strip "words by" prefix
-    assert_eq!("John Doe", normalize_authors("", "words by John Doe"));
-    // Strip trailing digits
-    assert_eq!("John Doe", normalize_authors("", "John Doe123"));
-    // Replace underscores with spaces
-    assert_eq!("John Doe", normalize_authors("", "John_Doe"));
-    // Strip trailing special chars like *
-    assert_eq!("John Doe", normalize_authors("", "John Doe* "));
-    // Deduplicate repeated name
-    assert_eq!("John Doe", normalize_authors("", "John Doe of John Doe"));
-    // Em-dash separator → deduplicate
-    assert_eq!("John Doe", normalize_authors("", "John Doe — John Doe"));
-    // Strip quoted nickname
-    assert_eq!("John Doe", normalize_authors("", r#"John "The King" Doe"#));
-}
 
 // ---------------------------------------------------------------------------
 // Test_Metadata_Authors — head and body author extraction + blacklist

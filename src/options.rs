@@ -2,6 +2,7 @@
 
 /// Controls whether extraction favors precision, recall, or a balance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum ExtractionFocus {
     #[default]
     Balanced,
@@ -12,13 +13,18 @@ pub enum ExtractionFocus {
 /// Controls how date extraction behaves.
 /// Port of HtmlDateMode in go-trafilatura.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum HtmlDateMode {
     /// Default: use Fast mode (meta + JSON-LD only).
     #[default]
     Default,
     /// Fast: meta elements and JSON-LD only (current behavior).
     Fast,
-    /// Extensive: also scan body text for dates (not yet implemented, behaves like Fast).
+    /// Extensive: also scan body text for dates.
+    ///
+    /// **Not yet implemented** — currently behaves identically to [`Fast`](Self::Fast).
+    /// The variant is kept to match the Go API; it will gain full behavior
+    /// when the `htmldate` integration is ported.
     Extensive,
     /// Disabled: skip date extraction entirely.
     Disabled,
@@ -27,6 +33,7 @@ pub enum HtmlDateMode {
 /// User-provided fallback content for when main extraction yields too little.
 /// Port of FallbackCandidates in go-trafilatura.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct FallbackCandidates {
     /// Pre-extracted HTML string from Readability or similar.
     pub readability_html: Option<String>,
@@ -34,6 +41,7 @@ pub struct FallbackCandidates {
 
 /// Advanced tuning parameters for the extraction algorithm.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Config {
     pub cache_size: usize,
     pub min_duplicate_check_size: usize,
@@ -69,14 +77,13 @@ impl Default for Config {
 /// ```rust
 /// use trafilatura::{Options, ExtractionFocus};
 ///
-/// let opts = Options {
-///     enable_fallback: true,
-///     include_links: true,
-///     focus: ExtractionFocus::FavorRecall,
-///     ..Options::default()
-/// };
+/// let mut opts = Options::default();
+/// opts.enable_fallback = true;
+/// opts.include_links = true;
+/// opts.focus = ExtractionFocus::FavorRecall;
 /// ```
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct Options {
     /// Advanced tuning parameters (cache size, minimum lengths, etc.).
     pub config: Config,
@@ -114,4 +121,118 @@ pub struct Options {
     pub html_date_override: Option<chrono::NaiveDate>,
     /// User-provided fallback candidates for content extraction.
     pub fallback_candidates: Option<FallbackCandidates>,
+}
+
+// ---------------------------------------------------------------------------
+// Builder methods
+// ---------------------------------------------------------------------------
+
+impl Options {
+    /// Enable or disable readability/baseline fallback extraction.
+    pub fn with_fallback(mut self, enable: bool) -> Self {
+        self.enable_fallback = enable;
+        self
+    }
+
+    /// Preserve `<a>` tags (hyperlinks) in output HTML.
+    pub fn with_links(mut self, include: bool) -> Self {
+        self.include_links = include;
+        self
+    }
+
+    /// Preserve `<img>` tags in output HTML.
+    pub fn with_images(mut self, include: bool) -> Self {
+        self.include_images = include;
+        self
+    }
+
+    /// Set the extraction focus (precision, recall, or balanced).
+    pub fn with_focus(mut self, focus: ExtractionFocus) -> Self {
+        self.focus = focus;
+        self
+    }
+
+    /// Skip comment extraction entirely.
+    pub fn with_exclude_comments(mut self, exclude: bool) -> Self {
+        self.exclude_comments = exclude;
+        self
+    }
+
+    /// Remove tables from extracted content.
+    pub fn with_exclude_tables(mut self, exclude: bool) -> Self {
+        self.exclude_tables = exclude;
+        self
+    }
+
+    /// Set the page's original URL for resolving relative links.
+    pub fn with_url(mut self, url: url::Url) -> Self {
+        self.original_url = Some(url);
+        self
+    }
+
+    /// Set the target language (ISO 639-1). Documents not matching are rejected.
+    pub fn with_target_language(mut self, lang: impl Into<String>) -> Self {
+        self.target_language = Some(lang.into());
+        self
+    }
+
+    /// Enable cross-document duplicate detection.
+    pub fn with_deduplicate(mut self, enable: bool) -> Self {
+        self.deduplicate = enable;
+        self
+    }
+
+    /// Set a CSS selector for elements to prune before extraction.
+    pub fn with_prune_selector(mut self, selector: impl Into<String>) -> Self {
+        self.prune_selector = Some(selector.into());
+        self
+    }
+
+    /// Require title, URL, and date in metadata or return an error.
+    pub fn with_essential_metadata(mut self, require: bool) -> Self {
+        self.has_essential_metadata = require;
+        self
+    }
+
+    /// Set the maximum number of DOM elements before returning `TreeTooLarge`.
+    pub fn with_max_tree_size(mut self, max: usize) -> Self {
+        self.max_tree_size = Some(max);
+        self
+    }
+
+    /// Set the advanced tuning configuration.
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Set the date extraction mode.
+    pub fn with_html_date_mode(mut self, mode: HtmlDateMode) -> Self {
+        self.html_date_mode = mode;
+        self
+    }
+
+    /// Override the extracted date with a fixed value.
+    pub fn with_html_date_override(mut self, date: chrono::NaiveDate) -> Self {
+        self.html_date_override = Some(date);
+        self
+    }
+
+    /// Set author names to exclude from metadata results.
+    pub fn with_blacklisted_authors(mut self, authors: Vec<String>) -> Self {
+        self.blacklisted_authors = authors;
+        self
+    }
+
+    /// Provide fallback candidates for content extraction.
+    pub fn with_fallback_candidates(mut self, candidates: FallbackCandidates) -> Self {
+        self.fallback_candidates = Some(candidates);
+        self
+    }
+
+    /// Enable or disable tracing log output.
+    pub fn with_log(mut self, enable: bool) -> Self {
+        self.enable_log = enable;
+        self
+    }
 }

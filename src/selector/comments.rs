@@ -4,7 +4,7 @@ use crate::dom::{Document, NodeId};
 use crate::selector::utils::{contains, starts_with};
 
 /// Ordered list of comment section detection rules.
-pub const COMMENTS: &[super::Rule] = &[
+pub(crate) const COMMENTS: &[super::Rule] = &[
     comments_rule1,
     comments_rule2,
     comments_rule3,

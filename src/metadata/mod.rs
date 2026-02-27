@@ -522,7 +522,7 @@ fn extract_open_graph_meta(doc: &Document) -> Metadata {
 // ---------------------------------------------------------------------------
 
 /// Port of `validateMetadataName`.
-pub fn validate_metadata_name(name: &str) -> String {
+pub(crate) fn validate_metadata_name(name: &str) -> String {
     if name.is_empty() {
         return String::new();
     }
@@ -818,7 +818,7 @@ fn parse_license_element(doc: &Document, node_id: crate::dom::NodeId, strict: bo
 // ---------------------------------------------------------------------------
 
 /// Port of `normalizeAuthors`.
-pub fn normalize_authors(authors: &str, input: &str) -> String {
+pub(crate) fn normalize_authors(authors: &str, input: &str) -> String {
     // Skip URLs and email addresses.
     if URL_CHECK.is_match(input) || AUTHOR_EMAIL.is_match(input) {
         return authors.to_string();
@@ -886,7 +886,7 @@ pub fn normalize_authors(authors: &str, input: &str) -> String {
 }
 
 /// Port of `removeBlacklistedAuthors`.
-pub fn remove_blacklisted_authors(current: &str, opts: &Options) -> String {
+pub(crate) fn remove_blacklisted_authors(current: &str, opts: &Options) -> String {
     if current.is_empty() || opts.blacklisted_authors.is_empty() {
         return current.to_string();
     }
@@ -1320,6 +1320,51 @@ mod tests {
         let result = normalize_authors("", "Alice Smith and Bob Jones");
         assert!(result.contains("Alice Smith"), "got: {result}");
         assert!(result.contains("Bob Jones"), "got: {result}");
+    }
+
+    #[test]
+    fn test_normalize_authors_comprehensive() {
+        assert_eq!("Abc", normalize_authors("", "abc"));
+        assert_eq!("Steve Steve", normalize_authors("", "Steve Steve 123"));
+        assert_eq!("Steve Steve", normalize_authors("", "By Steve Steve"));
+        assert_eq!(
+            "Seán Federico O'Murchú",
+            normalize_authors("", "Seán Federico O'Murchú")
+        );
+        assert_eq!("John Doe", normalize_authors("", "John Doe"));
+        assert_eq!(
+            "Alice; Bob; John Doe",
+            normalize_authors("Alice; Bob", "John Doe")
+        );
+        // Email should be skipped → return existing authors unchanged
+        assert_eq!(
+            "Alice; Bob",
+            normalize_authors("Alice; Bob", "john.doe@example.com")
+        );
+        // Unicode entity: \u00e9 = é → "Étienne"
+        assert_eq!("Étienne", normalize_authors("", "\u{00e9}tienne"));
+        // HTML entity: &#233; = é → "Étienne"
+        assert_eq!("Étienne", normalize_authors("", "&#233;tienne"));
+        // &amp; separator → "Alice; Bob"
+        assert_eq!("Alice; Bob", normalize_authors("", "Alice &amp; Bob"));
+        // Strip HTML tags
+        assert_eq!("John Doe", normalize_authors("", "<b>John Doe</b>"));
+        // Remove emoji
+        assert_eq!("John Doe", normalize_authors("", "John 😊 Doe"));
+        // Strip "words by" prefix
+        assert_eq!("John Doe", normalize_authors("", "words by John Doe"));
+        // Strip trailing digits
+        assert_eq!("John Doe", normalize_authors("", "John Doe123"));
+        // Replace underscores with spaces
+        assert_eq!("John Doe", normalize_authors("", "John_Doe"));
+        // Strip trailing special chars like *
+        assert_eq!("John Doe", normalize_authors("", "John Doe* "));
+        // Deduplicate repeated name
+        assert_eq!("John Doe", normalize_authors("", "John Doe of John Doe"));
+        // Em-dash separator → deduplicate
+        assert_eq!("John Doe", normalize_authors("", "John Doe — John Doe"));
+        // Strip quoted nickname
+        assert_eq!("John Doe", normalize_authors("", r#"John "The King" Doe"#));
     }
 
     // ---------------------------------------------------------------------------

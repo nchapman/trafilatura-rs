@@ -8,6 +8,10 @@ use tendril::StrTendril;
 
 use super::Document;
 
+/// Maximum recursion depth for DOM tree traversals.
+/// html5ever caps nesting at ~256 during parsing, so this is generous headroom.
+const MAX_TREE_DEPTH: usize = 500;
+
 /// HTML void elements — those that cannot have children.
 const VOID_ELEMENTS: &[&str] = &[
     "area", "base", "br", "col", "embed", "hr", "img", "input",
@@ -449,18 +453,19 @@ impl Document {
     /// Port of `removeHtmlCommentNode` (collection half).
     pub fn collect_comment_nodes(&self, root: NodeId) -> Vec<NodeId> {
         let mut result = Vec::new();
-        self.collect_comment_nodes_inner(root, &mut result);
+        self.collect_comment_nodes_inner(root, &mut result, 0);
         result
     }
 
-    fn collect_comment_nodes_inner(&self, id: NodeId, out: &mut Vec<NodeId>) {
+    fn collect_comment_nodes_inner(&self, id: NodeId, out: &mut Vec<NodeId>, depth: usize) {
+        if depth >= MAX_TREE_DEPTH { return; }
         let Some(node) = self.tree.get(id) else { return };
         for child in node.children() {
             let child_id = child.id();
             if let Node::Comment(_) = child.value() {
                 out.push(child_id);
             } else {
-                self.collect_comment_nodes_inner(child_id, out);
+                self.collect_comment_nodes_inner(child_id, out, depth + 1);
             }
         }
     }
@@ -513,13 +518,19 @@ impl Document {
 impl Document {
     /// Deep-clone `source` into `target_parent` as a new last child.
     pub(crate) fn clone_subtree_into(&mut self, source: NodeId, target_parent: NodeId) -> NodeId {
+        self.clone_subtree_into_inner(source, target_parent, 0)
+    }
+
+    fn clone_subtree_into_inner(&mut self, source: NodeId, target_parent: NodeId, depth: usize) -> NodeId {
         let val = self.tree.get(source).expect("source NodeId must be valid").value().clone();
         let new_id = self.tree.get_mut(target_parent).expect("target_parent NodeId must be valid").append(val).id();
 
-        let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
-            .children().map(|c| c.id()).collect();
-        for child_id in children {
-            self.clone_subtree_into(child_id, new_id);
+        if depth < MAX_TREE_DEPTH {
+            let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
+                .children().map(|c| c.id()).collect();
+            for child_id in children {
+                self.clone_subtree_into_inner(child_id, new_id, depth + 1);
+            }
         }
         new_id
     }
@@ -529,10 +540,12 @@ impl Document {
         let val = self.tree.get(source).expect("source NodeId must be valid").value().clone();
         let new_id = self.tree.get_mut(target_sibling).expect("target_sibling NodeId must be valid").insert_before(val).id();
 
+        // Root is depth 0 (unconditionally cloned above); children start at depth 1,
+        // matching clone_subtree_into's behavior via clone_subtree_into_inner(child, new_id, 0+1).
         let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
             .children().map(|c| c.id()).collect();
         for child_id in children {
-            self.clone_subtree_into(child_id, new_id);
+            self.clone_subtree_into_inner(child_id, new_id, 1);
         }
         new_id
     }
@@ -544,13 +557,25 @@ impl Document {
         source_id: NodeId,
         target_parent: NodeId,
     ) -> NodeId {
+        self.clone_from_tree_inner(source_tree, source_id, target_parent, 0)
+    }
+
+    fn clone_from_tree_inner(
+        &mut self,
+        source_tree: &ego_tree::Tree<Node>,
+        source_id: NodeId,
+        target_parent: NodeId,
+        depth: usize,
+    ) -> NodeId {
         let val = source_tree.get(source_id).expect("source_id must be valid in source tree").value().clone();
         let new_id = self.tree.get_mut(target_parent).expect("target_parent NodeId must be valid").append(val).id();
 
-        let children: Vec<NodeId> = source_tree.get(source_id).expect("source_id must be valid in source tree")
-            .children().map(|c| c.id()).collect();
-        for child_id in children {
-            self.clone_from_tree(source_tree, child_id, new_id);
+        if depth < MAX_TREE_DEPTH {
+            let children: Vec<NodeId> = source_tree.get(source_id).expect("source_id must be valid in source tree")
+                .children().map(|c| c.id()).collect();
+            for child_id in children {
+                self.clone_from_tree_inner(source_tree, child_id, new_id, depth + 1);
+            }
         }
         new_id
     }
@@ -589,7 +614,7 @@ impl Document {
     /// Port of `etree.Iter`.
     pub fn iter(&self, id: NodeId, tags: &[&str]) -> Vec<NodeId> {
         let mut result = Vec::new();
-        self.collect_iter(id, tags, true, &mut result);
+        self.collect_iter(id, tags, true, &mut result, 0);
         result
     }
 
@@ -598,11 +623,12 @@ impl Document {
     /// Port of `etree.IterDescendants`.
     pub fn iter_descendants(&self, id: NodeId, tags: &[&str]) -> Vec<NodeId> {
         let mut result = Vec::new();
-        self.collect_iter(id, tags, false, &mut result);
+        self.collect_iter(id, tags, false, &mut result, 0);
         result
     }
 
-    fn collect_iter(&self, id: NodeId, tags: &[&str], include_self: bool, out: &mut Vec<NodeId>) {
+    fn collect_iter(&self, id: NodeId, tags: &[&str], include_self: bool, out: &mut Vec<NodeId>, depth: usize) {
+        if depth >= MAX_TREE_DEPTH { return; }
         let Some(node) = self.tree.get(id) else { return };
 
         // Only include Element nodes in results; always recurse into children.
@@ -614,7 +640,7 @@ impl Document {
         }
 
         for child in node.children() {
-            self.collect_iter(child.id(), tags, true, out);
+            self.collect_iter(child.id(), tags, true, out, depth + 1);
         }
     }
 
@@ -636,6 +662,7 @@ impl Document {
         buf: &mut String,
         last_level: &mut usize,
     ) {
+        if level >= MAX_TREE_DEPTH { return; }
         let Some(node) = self.tree.get(id) else { return };
 
         match node.value() {
@@ -665,17 +692,18 @@ impl Document {
     /// Equivalent to `dom.TextContent` in Go.
     pub fn text_content(&self, id: NodeId) -> String {
         let mut result = String::new();
-        self.collect_text(id, &mut result);
+        self.collect_text(id, &mut result, 0);
         result
     }
 
-    fn collect_text(&self, id: NodeId, out: &mut String) {
+    fn collect_text(&self, id: NodeId, out: &mut String, depth: usize) {
+        if depth >= MAX_TREE_DEPTH { return; }
         let Some(node) = self.tree.get(id) else { return };
         if let Node::Text(t) = node.value() {
             out.push_str(t.as_ref());
         }
         for child in node.children() {
-            self.collect_text(child.id(), out);
+            self.collect_text(child.id(), out, depth + 1);
         }
     }
 }
@@ -1292,5 +1320,44 @@ mod tests {
             d.text_content(article),
             "text content of extracted subtree must match original"
         );
+    }
+
+    #[test]
+    fn test_depth_guard_deeply_nested() {
+        // Build HTML with nesting deeper than MAX_TREE_DEPTH.
+        // html5ever limits parsing depth to ~256, so we test via clone/traversal
+        // on a normally-parsed doc to verify guards don't break normal operation,
+        // and verify that the functions return gracefully (no stack overflow).
+        let mut html = String::from("<html><body>");
+        let depth = 200;
+        for _ in 0..depth {
+            html.push_str("<div>");
+        }
+        html.push_str("leaf");
+        for _ in 0..depth {
+            html.push_str("</div>");
+        }
+        html.push_str("</body></html>");
+
+        let d = Document::parse(&html);
+        let body = d.body().unwrap();
+
+        // All traversal functions should complete without stack overflow.
+        let all = d.get_elements_by_tag_name(body, "div");
+        assert!(!all.is_empty());
+
+        let text = d.text_content(body);
+        assert!(text.contains("leaf"));
+
+        let iter_nodes = d.iter(body, &[]);
+        assert!(!iter_nodes.is_empty());
+
+        let iter_text = d.iter_text(body, " ");
+        assert!(iter_text.contains("leaf"));
+
+        // Clone should work without overflow.
+        let cloned = d.clone_document();
+        let cloned_body = cloned.body().unwrap();
+        assert_eq!(cloned.text_content(cloned_body), text);
     }
 }

@@ -154,13 +154,14 @@ fn run_comparison(title: &str, enable_fallback: bool, focus: ExtractionFocus) ->
         };
 
         let url = url::Url::parse(&entry.url).ok();
-        let opts = Options {
-            original_url: url,
-            enable_fallback,
-            focus,
-            exclude_comments: true,
-            exclude_tables: false,
-            ..Options::default()
+        let opts = {
+            let mut o = Options::default();
+            o.original_url = url;
+            o.enable_fallback = enable_fallback;
+            o.focus = focus;
+            o.exclude_comments = true;
+            o.exclude_tables = false;
+            o
         };
 
         let result = trafilatura::extract(&html, opts)

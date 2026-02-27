@@ -4,6 +4,7 @@ use serde::Serialize;
 
 /// The result of content extraction.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct ExtractResult {
     /// Extracted content as plain text.
     pub content_text: String,
@@ -24,6 +25,7 @@ pub struct ExtractResult {
 
 /// Metadata extracted from the document via meta tags, JSON-LD, OpenGraph, etc.
 #[derive(Debug, Clone, Default, Serialize)]
+#[non_exhaustive]
 pub struct Metadata {
     pub title: String,
     pub author: String,

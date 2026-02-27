@@ -36,7 +36,7 @@ type FallbackGenerator = Box<dyn FnOnce() -> Option<(&'static str, Document)>>;
 /// `len_extracted >= MinExtractedSize`.
 ///
 /// Port of `compareExternalExtraction`.
-pub fn compare_external_extraction(
+pub(crate) fn compare_external_extraction(
     original_doc: &Document,
     extracted_doc: Document,
     opts: &Options,
@@ -164,7 +164,7 @@ fn body_text(doc: &Document) -> String {
 /// Check if a fallback candidate is better than the current extraction result.
 ///
 /// Port of `candidateIsUsable`.
-pub fn candidate_is_usable(
+pub(crate) fn candidate_is_usable(
     candidate_doc: &Document,
     extracted_doc: &Document,
     len_candidate: usize,
@@ -221,7 +221,7 @@ pub fn candidate_is_usable(
 /// 4. Strip any tag not in `VALID_TAG_CATALOG`.
 ///
 /// Port of `sanitizeTree`.
-pub fn sanitize_tree(doc: &mut Document, opts: &Options) {
+pub(crate) fn sanitize_tree(doc: &mut Document, opts: &Options) {
     // Step 1: standard document cleaning.
     doc_cleaning(doc, opts);
 
