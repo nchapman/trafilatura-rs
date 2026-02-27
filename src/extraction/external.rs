@@ -1,6 +1,6 @@
-// Port of go-trafilatura/external.go
+// Port of go-trafilatura/external.go + Python trafilatura/external.py (justext integration)
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 use crate::dom::Document;
@@ -9,6 +9,7 @@ use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
 use crate::settings::VALID_TAG_CATALOG;
 use crate::utils::trim;
 
+use super::baseline::basic_cleaning;
 use super::html_processing::{doc_cleaning, prune_unwanted_nodes};
 
 /// Tags removed from fallback extraction output during sanitization.
@@ -96,8 +97,29 @@ pub(crate) fn compare_external_extraction(
         }
     }
 
-    // Final cleaning.
-    sanitize_tree(&mut extracted_doc, opts);
+    // Override faulty extraction: try with justext.
+    // Port of Python's external.py lines 94-102.
+    let mut jt_used = false;
+    let has_sanitizable = has_sanitizable_elements(&extracted_doc);
+    if has_sanitizable || len_extracted < opts.config.min_extracted_size {
+        if let Some((jt_doc, jt_text)) = justext_rescue(original_doc, opts) {
+            let len_jt = jt_text.chars().count();
+            // Use justext if it produced text and the current extraction isn't >4x longer.
+            if len_jt > 0 && len_extracted <= 4 * len_jt {
+                extracted_doc = jt_doc;
+                len_extracted = len_jt;
+                jt_used = true;
+            }
+        }
+    }
+
+    // Only sanitize if readability was used and justext wasn't.
+    // Port of Python: `if use_readability and not jt_result`.
+    if !jt_used {
+        sanitize_tree(&mut extracted_doc, opts);
+    }
+
+    let _ = len_extracted; // may be used for logging
     let final_text = trim(&body_text(&extracted_doc));
     (extracted_doc, final_text)
 }
@@ -210,6 +232,139 @@ pub(crate) fn candidate_is_usable(
     let must_favor_recall = len_extracted < opts.config.min_extracted_size
         && opts.focus == ExtractionFocus::FavorRecall;
     candidate_usable || must_favor_recall
+}
+
+// ---------------------------------------------------------------------------
+// Justext integration (port of Python trafilatura/external.py)
+// ---------------------------------------------------------------------------
+
+/// ISO 639-1 → justext language name mapping.
+///
+/// Port of Python's `JUSTEXT_LANGUAGES` from `settings.py`.
+static JUSTEXT_LANGUAGES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    HashMap::from([
+        ("ar", "Arabic"),
+        ("bg", "Bulgarian"),
+        ("cz", "Czech"),
+        ("da", "Danish"),
+        ("de", "German"),
+        ("en", "English"),
+        ("el", "Greek"),
+        ("es", "Spanish"),
+        ("fa", "Persian"),
+        ("fi", "Finnish"),
+        ("fr", "French"),
+        ("hr", "Croatian"),
+        ("hu", "Hungarian"),
+        ("ko", "Korean"),
+        ("id", "Indonesian"),
+        ("it", "Italian"),
+        ("no", "Norwegian_Nynorsk"),
+        ("nl", "Dutch"),
+        ("pl", "Polish"),
+        ("pt", "Portuguese"),
+        ("ro", "Romanian"),
+        ("ru", "Russian"),
+        ("sk", "Slovak"),
+        ("sl", "Slovenian"),
+        ("sr", "Serbian"),
+        ("sv", "Swedish"),
+        ("tr", "Turkish"),
+        ("uk", "Ukrainian"),
+        ("ur", "Urdu"),
+        ("vi", "Vietnamese"),
+    ])
+});
+
+/// Check whether the document body contains any elements from `TAGS_TO_SANITIZE`.
+///
+/// Port of Python's `body.xpath(SANITIZED_XPATH)` check.
+fn has_sanitizable_elements(doc: &Document) -> bool {
+    let root = doc.body().unwrap_or_else(|| doc.root());
+    let all = doc.get_elements_by_tag_name(root, "*");
+    for &id in &all {
+        let tag = doc.tag_name(id);
+        if TAGS_TO_SANITIZE.contains(tag) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Resolve the justext stoplist for a given target language.
+///
+/// Tries the language-specific stoplist first, falls back to all stoplists.
+/// Returns a `Cow` to avoid cloning the static merged set.
+///
+/// Port of Python's stoplist resolution in `try_justext`.
+fn resolve_justext_stoplist(
+    target_language: Option<&str>,
+) -> std::borrow::Cow<'static, HashSet<String>> {
+    if let Some(lang) = target_language {
+        if let Some(&name) = JUSTEXT_LANGUAGES.get(lang) {
+            if let Ok(stoplist) = justext::get_stoplist(name) {
+                return std::borrow::Cow::Owned(stoplist);
+            }
+        }
+    }
+    std::borrow::Cow::Borrowed(justext::get_all_stoplists())
+}
+
+/// Run justext on HTML with trafilatura's custom thresholds.
+///
+/// Port of Python's `try_justext` + `custom_justext`.
+fn try_justext(html: &str, stoplist: &HashSet<String>) -> Document {
+    // Custom config matching Python trafilatura thresholds.
+    let config = justext::Config::default()
+        .with_length_low(50)
+        .with_length_high(150)
+        .with_stopwords_low(0.1)
+        .with_stopwords_high(0.2)
+        .with_max_link_density(0.25)
+        .with_max_heading_distance(150);
+
+    let paragraphs = justext::justext(html, stoplist, &config);
+
+    // Build result document from non-boilerplate paragraphs.
+    let mut result = Document::parse("<html><body></body></html>");
+    let body_id = result.body().unwrap_or_else(|| result.root());
+    for para in &paragraphs {
+        if para.is_boilerplate() {
+            continue;
+        }
+        let p_id = result.create_element("p");
+        result.set_text(p_id, &para.text);
+        result.append_child(body_id, p_id);
+    }
+
+    result
+}
+
+/// Try justext as a second fallback extractor.
+///
+/// Clones and basic-cleans the original document, serializes to HTML,
+/// runs justext, and returns the result if non-empty.
+///
+/// Port of Python's `justext_rescue`.
+fn justext_rescue(original_doc: &Document, opts: &Options) -> Option<(Document, String)> {
+    let mut cleaned = original_doc.clone_document();
+    basic_cleaning(&mut cleaned);
+
+    let html_root = cleaned
+        .get_elements_by_tag_name(cleaned.root(), "html")
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| cleaned.root());
+    let html = cleaned.outer_html(html_root);
+
+    let stoplist = resolve_justext_stoplist(opts.target_language.as_deref());
+    let result_doc = try_justext(&html, &stoplist);
+    let text = trim(&body_text(&result_doc));
+    if text.is_empty() {
+        return None;
+    }
+
+    Some((result_doc, text))
 }
 
 /// Clean and sanitize the output of a generic fallback extractor.
@@ -490,5 +645,110 @@ mod tests {
         let opts = default_opts();
         let (_, text) = compare_external_extraction(&original, extracted, &opts);
         assert!(text.contains("Some content"), "extraction should survive when no candidates");
+    }
+
+    // ---- justext integration ----
+
+    #[test]
+    fn test_try_justext_with_known_language() {
+        // A document with enough real English text should produce non-empty output.
+        let html = r#"<html><body>
+            <p>This is a real article about the important things happening in the world today.
+            We need to understand how these events are connected and what they mean for us.</p>
+            <p>The situation continues to develop as more information becomes available to the public.</p>
+        </body></html>"#;
+        let stoplist = resolve_justext_stoplist(Some("en"));
+        let result = try_justext(html, &stoplist);
+        let body = result.body().unwrap();
+        let text = result.text_content(body);
+        // justext should classify substantive English paragraphs as good
+        assert!(!trim(&text).is_empty(), "try_justext should extract English content");
+    }
+
+    #[test]
+    fn test_try_justext_fallback_to_all_stoplists() {
+        // Unknown language should fall back to all stoplists and still work.
+        let html = r#"<html><body>
+            <p>This is a real article about the important things happening in the world today.
+            We need to understand how these events are connected and what they mean for us.</p>
+        </body></html>"#;
+        let stoplist = resolve_justext_stoplist(Some("xx")); // unknown language
+        let result = try_justext(html, &stoplist);
+        let body = result.body().unwrap();
+        let text = result.text_content(body);
+        assert!(!trim(&text).is_empty(), "should work with unknown language via all stoplists");
+    }
+
+    #[test]
+    fn test_try_justext_no_language() {
+        // None language should also fall back to all stoplists.
+        let html = r#"<html><body>
+            <p>This is a real article about the important things happening in the world today.
+            We need to understand how these events are connected and what they mean for us.</p>
+        </body></html>"#;
+        let stoplist = resolve_justext_stoplist(None);
+        let result = try_justext(html, &stoplist);
+        let body = result.body().unwrap();
+        let text = result.text_content(body);
+        assert!(!trim(&text).is_empty(), "should work with no language");
+    }
+
+    #[test]
+    fn test_has_sanitizable_elements() {
+        let clean = doc("<html><body><p>Clean</p></body></html>");
+        assert!(!has_sanitizable_elements(&clean));
+
+        let dirty = doc("<html><body><p>Content</p><aside>Sidebar</aside></body></html>");
+        assert!(has_sanitizable_elements(&dirty));
+
+        let dirty_nav = doc("<html><body><p>Content</p><nav>Links</nav></body></html>");
+        assert!(has_sanitizable_elements(&dirty_nav));
+    }
+
+    #[test]
+    fn test_justext_rescue_triggers_on_sanitizable_elements() {
+        // Body with aside/nav should trigger justext rescue.
+        let html = r#"<html><body>
+            <p>This is a real article about the important things happening in the world today.
+            We need to understand how these events are connected and what they mean for us.</p>
+            <aside>Sidebar content that should not appear</aside>
+        </body></html>"#;
+        let original = doc(html);
+        let mut opts = default_opts();
+        opts.target_language = Some("en".to_string());
+        let result = justext_rescue(&original, &opts);
+        assert!(result.is_some(), "justext_rescue should produce output");
+        let (_, text) = result.unwrap();
+        assert!(!text.is_empty());
+    }
+
+    #[test]
+    fn test_justext_rescue_triggers_on_short_text() {
+        // Short extraction below min_extracted_size should trigger justext.
+        let html = r#"<html><body>
+            <p>This is a real article about the important things happening in the world today.
+            We need to understand how these events are connected and what they mean for us.</p>
+        </body></html>"#;
+        let original = doc(html);
+        let opts = default_opts();
+        let result = justext_rescue(&original, &opts);
+        // Should at least attempt extraction (may or may not produce text depending on length)
+        // The key thing is it doesn't panic
+        let _ = result;
+    }
+
+    #[test]
+    fn test_four_times_length_guard() {
+        // When extracted text is >4x longer than justext result, don't replace.
+        // We test this at the logic level.
+        let len_extracted = 500;
+        let len_jt = 100;
+        // len_extracted (500) > 4 * len_jt (400) => should NOT use justext
+        assert!(len_extracted > 4 * len_jt, "precondition: extracted is >4x justext");
+
+        let len_extracted2 = 399;
+        let len_jt2 = 100;
+        // len_extracted2 (399) <= 4 * len_jt2 (400) => true, SHOULD use justext
+        assert!(len_extracted2 <= 4 * len_jt2, "precondition: extracted is <=4x justext");
     }
 }

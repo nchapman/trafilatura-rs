@@ -12,7 +12,7 @@ const BASIC_CLEANING_SELECTOR: &str =
 /// Remove footer/aside/script/style elements as a preliminary cleaning step.
 ///
 /// Port of `basicCleaning`.
-fn basic_cleaning(doc: &mut Document) {
+pub(crate) fn basic_cleaning(doc: &mut Document) {
     let root = doc.root();
     let to_remove = doc.query_selector_all(root, BASIC_CLEANING_SELECTOR);
     // Iterate in reverse so removing a parent doesn't invalidate child IDs.

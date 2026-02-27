@@ -32,15 +32,6 @@ impl LruCache {
         self.data.get(key).copied()
     }
 
-    /// Remove a single entry from the cache.
-    ///
-    /// Port of `Cache.Remove`.
-    pub fn remove(&mut self, key: &str) {
-        if self.data.remove(key).is_some() {
-            self.keys.retain(|k| k != key);
-        }
-    }
-
     /// Store a value in the cache, evicting the oldest entry if full.
     ///
     /// Port of `Cache.Put`.
@@ -62,13 +53,6 @@ impl LruCache {
         self.data.insert(key, value);
     }
 
-    /// Remove all entries from the cache.
-    ///
-    /// Port of `Cache.Clear`.
-    pub fn clear(&mut self) {
-        self.keys.clear();
-        self.data.clear();
-    }
 }
 
 #[cfg(test)]
@@ -105,27 +89,6 @@ mod tests {
         assert_eq!(cache.get("b"), Some(2));
         assert_eq!(cache.get("c"), Some(3));
         assert_eq!(cache.get("d"), Some(4));
-    }
-
-    #[test]
-    fn test_remove() {
-        let mut cache = LruCache::new(10);
-        cache.put("x".to_string(), 99);
-        cache.remove("x");
-        assert_eq!(cache.get("x"), None);
-        // Removing a non-existent key is a no-op.
-        cache.remove("nonexistent");
-    }
-
-    #[test]
-    fn test_clear() {
-        let mut cache = LruCache::new(10);
-        cache.put("a".to_string(), 1);
-        cache.put("b".to_string(), 2);
-        cache.clear();
-        assert_eq!(cache.get("a"), None);
-        assert_eq!(cache.get("b"), None);
-        assert!(cache.keys.is_empty());
     }
 
     #[test]
