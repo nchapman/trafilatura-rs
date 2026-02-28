@@ -77,6 +77,44 @@ trafilatura --links https://example.com/article
    extraction or baseline (last-resort) extraction
 5. Filter duplicates and check language constraints
 
+## Language bindings
+
+Python, Swift, and Kotlin bindings are available via [UniFFI](https://mozilla.github.io/uniffi-rs/).
+
+```sh
+make test-bindings   # run all binding test suites
+make test-python     # Python only (pytest)
+make test-swift      # Swift only (XCTest)
+make test-kotlin     # Kotlin only (JUnit 5)
+```
+
+### Python
+
+```python
+from trafilatura_uniffi import extract_simple
+
+result = extract_simple(html)
+print(result.content_text, result.metadata.title)
+```
+
+### Swift
+
+```swift
+import Trafilatura
+
+let result = try extractSimple(html: html)
+print(result.contentText, result.metadata.title)
+```
+
+### Kotlin
+
+```kotlin
+import uniffi.trafilatura_uniffi.*
+
+val result = extractSimple(html)
+println("${result.contentText} ${result.metadata.title}")
+```
+
 ## Benchmarks
 
 ### Speed
