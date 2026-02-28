@@ -222,7 +222,8 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
         }
     }
 
-    // Size checks.
+    // Size checks — both must be below their minimums. If either meets its
+    // threshold the document is considered valid.
     let len_text = tmp_body_text.chars().count();
     if len_text < opts.config.min_output_size && len_comments < opts.config.min_output_comment_size
     {
