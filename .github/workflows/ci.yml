@@ -9,22 +9,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: ${{ matrix.toolchain }} / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        toolchain: [stable, "1.83"]
+  msrv:
+    name: MSRV (1.83)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: "1.83"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --lib --locked
+
+  test:
+    name: Test (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
-        if: matrix.toolchain == 'stable'
-      - run: cargo clippy -- -D warnings
-      - run: cargo test
+      - run: cargo clippy --locked -- -D warnings
+      - run: cargo test --locked
