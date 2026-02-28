@@ -416,8 +416,7 @@ mod tests {
              minimum extracted size in the extractor pipeline.</p></article>\
              <div id=\"comments\"><p>User comment here</p></div>",
         );
-        let mut opts = Options::default();
-        opts.exclude_comments = true;
+        let opts = Options::default().with_exclude_comments(true);
         let result = extract(&html, &opts).unwrap();
         assert!(
             result.comments_text.is_empty(),
@@ -429,8 +428,7 @@ mod tests {
     fn test_extract_missing_essential_metadata_title() {
         let html = "<html><body><p>Content that is long enough to pass the minimum size \
                     threshold for the extraction algorithm to work properly.</p></body></html>";
-        let mut opts = Options::default();
-        opts.has_essential_metadata = true;
+        let opts = Options::default().with_essential_metadata(true);
         let result = extract(html, &opts);
         // No <title> in this document → should fail with MissingMetadata
         assert!(
@@ -445,8 +443,7 @@ mod tests {
             "<div class='content'><p>Some content in a div that recall mode should pick up \
              even without a standard article tag structure.</p></div>",
         );
-        let mut opts = Options::default();
-        opts.focus = ExtractionFocus::FavorRecall;
+        let opts = Options::default().with_focus(ExtractionFocus::FavorRecall);
         // Should not error; recall mode is more permissive
         let _ = extract(&html, &opts); // result may or may not have content; just check no panic
     }
@@ -488,8 +485,7 @@ mod tests {
         let html = "<html><head><title>My Title</title></head>\
                     <body><article><p>Content that is long enough to pass the minimum \
                     size threshold for the extraction algorithm.</p></article></body></html>";
-        let mut opts = Options::default();
-        opts.has_essential_metadata = true;
+        let opts = Options::default().with_essential_metadata(true);
         let result = extract(html, &opts);
         assert!(
             matches!(result, Err(TrafilaturaError::MissingMetadata(_))),
@@ -508,8 +504,7 @@ mod tests {
             <body><article><p>Content that is long enough to pass the minimum size
             threshold for the extraction algorithm to work correctly.</p></article></body>
         </html>"#;
-        let mut opts = Options::default();
-        opts.has_essential_metadata = true;
+        let opts = Options::default().with_essential_metadata(true);
         let result = extract(html, &opts);
         assert!(
             matches!(result, Err(TrafilaturaError::MissingMetadata(_))),
@@ -525,8 +520,7 @@ mod tests {
              pass the minimum size threshold.</p></article>\
              <div class=\"sidebar\"><p>Remove this sidebar text.</p></div>",
         );
-        let mut opts = Options::default();
-        opts.prune_selector = Some(".sidebar".into());
+        let opts = Options::default().with_prune_selector(".sidebar");
         let result = extract(&html, &opts).unwrap();
         assert!(
             !result.content_text.contains("Remove this sidebar"),
@@ -545,8 +539,7 @@ mod tests {
             .map(|i| format!("<p>Paragraph number {i} with enough text.</p>"))
             .collect();
         let html = simple_article(&many_ps);
-        let mut opts = Options::default();
-        opts.max_tree_size = Some(10); // tiny limit → should trigger TreeTooLarge
+        let opts = Options::default().with_max_tree_size(10);
         let result = extract(&html, &opts);
         assert!(
             matches!(result, Err(TrafilaturaError::TreeTooLarge(_))),
@@ -563,8 +556,7 @@ mod tests {
             "<article><p>Short text that is just barely long enough to pass the minimum \
              size threshold but may not be long enough to detect a language reliably.</p></article>",
         );
-        let mut opts = Options::default();
-        opts.target_language = Some("zh".into()); // Chinese — definitely won't match
+        let opts = Options::default().with_target_language("zh");
         let result = extract(&html, &opts);
         // Either the language was detected (and mismatched) or empty (and mismatched with "zh").
         // Either way, the result must be an error.

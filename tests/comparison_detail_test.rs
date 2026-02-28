@@ -88,12 +88,11 @@ fn comparison_detail() {
 
         let url = url::Url::parse(&entry.url).ok();
         let opts = {
-            let mut o = Options::default();
+            let mut o = Options::default()
+                .with_fallback(true)
+                .with_focus(ExtractionFocus::Balanced)
+                .with_exclude_comments(true);
             o.original_url = url;
-            o.enable_fallback = true;
-            o.focus = ExtractionFocus::Balanced;
-            o.exclude_comments = true;
-            o.exclude_tables = false;
             o
         };
 
@@ -146,7 +145,7 @@ fn comparison_detail() {
             url: entry.url.clone(),
             text_len: text.len(),
             tp,
-            fn_: fn_,
+            fn_,
             fp,
             tn,
             details,

@@ -18,9 +18,8 @@ use trafilatura::options::{ExtractionFocus, Options};
 // ---------------------------------------------------------------------------
 
 fn test_files_dir() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("test-files")
-        .leak()
+    static DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("test-files"))
 }
 
 fn load_mock(filename: &str) -> String {

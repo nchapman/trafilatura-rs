@@ -1580,8 +1580,10 @@ mod tests {
             <meta property="article:published_time" content="2022-03-15"/>
         </head><body></body></html>"#;
         let doc = parse(html);
-        let mut opts = Options::default();
-        opts.html_date_mode = HtmlDateMode::Disabled;
+        let opts = Options {
+            html_date_mode: HtmlDateMode::Disabled,
+            ..Options::default()
+        };
         let meta = extract_metadata(&doc, &opts);
         assert!(
             meta.date.is_none(),
@@ -1596,8 +1598,10 @@ mod tests {
         </head><body></body></html>"#;
         let doc = parse(html);
         let override_date = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
-        let mut opts = Options::default();
-        opts.html_date_override = Some(override_date);
+        let opts = Options {
+            html_date_override: Some(override_date),
+            ..Options::default()
+        };
         let meta = extract_metadata(&doc, &opts);
         assert_eq!(
             meta.date,
@@ -1612,8 +1616,10 @@ mod tests {
             <meta property="article:published_time" content="2022-03-15"/>
         </head><body></body></html>"#;
         let doc = parse(html);
-        let mut opts = Options::default();
-        opts.html_date_mode = HtmlDateMode::Fast;
+        let opts = Options {
+            html_date_mode: HtmlDateMode::Fast,
+            ..Options::default()
+        };
         let meta = extract_metadata(&doc, &opts);
         let expected = chrono::NaiveDate::from_ymd_opt(2022, 3, 15).unwrap();
         assert_eq!(meta.date, Some(expected));
