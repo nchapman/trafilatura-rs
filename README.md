@@ -81,12 +81,14 @@ trafilatura --links https://example.com/article
 
 ### Speed
 
-| Document | Size | Time | Throughput |
-|----------|-----:|-----:|-----------:|
-| small | 6 KB | 793 µs | 14 MiB/s |
-| medium | 85 KB | 5.7 ms | 31 MiB/s |
-| large | 382 KB | 3.6 ms | 101 MiB/s |
-| xlarge | 906 KB | 10.4 ms | 83 MiB/s |
+Extraction time per document, Rust vs Go ([go-trafilatura](https://github.com/markusmobius/go-trafilatura)) vs Python ([trafilatura](https://github.com/adbar/trafilatura)):
+
+| Document | Rust | Go | Python |
+|----------|-----:|---:|-------:|
+| small (6 KB) | 793 µs | 1.19 ms | 1.1 ms |
+| medium (85 KB) | 5.7 ms | 5.6 ms | 6.2 ms |
+| large (382 KB) | 3.6 ms | 4.9 ms | 4.7 ms |
+| xlarge (906 KB) | 10.4 ms | 13.9 ms | 13.9 ms |
 
 ### Extraction quality
 
