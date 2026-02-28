@@ -18,7 +18,7 @@
 //!   <footer>Copyright 2024</footer>
 //! </body></html>"#;
 //!
-//! let result = extract(html, Options::default()).unwrap();
+//! let result = extract(html, &Options::default()).unwrap();
 //! assert!(result.content_text.contains("main article content"));
 //! ```
 //!
@@ -46,9 +46,18 @@
 //!     .with_fallback(true)
 //!     .with_links(true)
 //!     .with_focus(ExtractionFocus::FavorRecall);
-//! let result = extract(html, opts).unwrap();
+//! let result = extract(html, &opts).unwrap();
 //! assert_eq!(result.content_text, "Hello world");
 //! ```
+//!
+//! # Related crates
+//!
+//! - [`libreadability`](https://crates.io/crates/libreadability) — Mozilla Readability
+//!   port for extracting a clean article DOM subtree.
+//! - [`justext`](https://crates.io/crates/justext) — paragraph-level boilerplate
+//!   removal using stopword density.
+//! - [`html2markdown`](https://crates.io/crates/html2markdown) — converts HTML to
+//!   Markdown via an intermediate AST.
 
 pub mod dom;
 pub mod error;
@@ -99,10 +108,10 @@ use crate::utils::{
 /// use trafilatura::{extract, Options};
 ///
 /// let html = "<html><body><article><p>Hello world</p></article></body></html>";
-/// let result = extract(html, Options::default()).unwrap();
+/// let result = extract(html, &Options::default()).unwrap();
 /// assert_eq!(result.content_text, "Hello world");
 /// ```
-pub fn extract(html: &str, opts: Options) -> Result<ExtractResult, TrafilaturaError> {
+pub fn extract(html: &str, opts: &Options) -> Result<ExtractResult, TrafilaturaError> {
     let doc = Document::parse(html);
     extract_document(doc, opts)
 }
@@ -113,8 +122,9 @@ pub fn extract(html: &str, opts: Options) -> Result<ExtractResult, TrafilaturaEr
 /// and want to avoid re-parsing. The extraction pipeline is the same as [`extract`].
 ///
 /// Port of `ExtractDocument`.
-pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, TrafilaturaError> {
-    let mut opts = opts;
+pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, TrafilaturaError> {
+    // Clone opts so we can mutate original_url if needed.
+    let mut opts = opts.clone();
 
     // Prepare LRU cache for duplicate detection.
     let mut cache = LruCache::new(opts.config.cache_size);
@@ -219,6 +229,8 @@ pub fn extract_document(doc: Document, opts: Options) -> Result<ExtractResult, T
         return Err(TrafilaturaError::InsufficientContent {
             text_len: len_text,
             comment_len: len_comments,
+            min_output_size: opts.config.min_output_size,
+            min_output_comment_size: opts.config.min_output_comment_size,
         });
     }
 
@@ -360,7 +372,7 @@ mod tests {
             "<article><p>This is the main content of the article. It has enough text to pass \
              the minimum size threshold for extraction and should appear in the result.</p></article>",
         );
-        let result = extract(&html, Options::default()).unwrap();
+        let result = extract(&html, &Options::default()).unwrap();
         assert!(
             !result.content_text.is_empty(),
             "should extract content text"
@@ -379,7 +391,7 @@ mod tests {
              <article><p>Real content here that is long enough to be extracted without \
              any issues from the minimum size requirements.</p></article>",
         );
-        let result = extract(&html, Options::default()).unwrap();
+        let result = extract(&html, &Options::default()).unwrap();
         assert!(
             !result.content_text.contains("Navigation"),
             "nav should be stripped"
@@ -392,7 +404,7 @@ mod tests {
 
     #[test]
     fn test_extract_empty_html_returns_error() {
-        let result = extract("", Options::default());
+        let result = extract("", &Options::default());
         assert!(result.is_err(), "empty HTML should return an error");
     }
 
@@ -405,7 +417,7 @@ mod tests {
         );
         let mut opts = Options::default();
         opts.exclude_comments = true;
-        let result = extract(&html, opts).unwrap();
+        let result = extract(&html, &opts).unwrap();
         assert!(
             result.comments_text.is_empty(),
             "comments should be excluded"
@@ -418,7 +430,7 @@ mod tests {
                     threshold for the extraction algorithm to work properly.</p></body></html>";
         let mut opts = Options::default();
         opts.has_essential_metadata = true;
-        let result = extract(html, opts);
+        let result = extract(html, &opts);
         // No <title> in this document → should fail with MissingMetadata
         assert!(
             matches!(result, Err(TrafilaturaError::MissingMetadata(_))),
@@ -435,7 +447,7 @@ mod tests {
         let mut opts = Options::default();
         opts.focus = ExtractionFocus::FavorRecall;
         // Should not error; recall mode is more permissive
-        let _ = extract(&html, opts); // result may or may not have content; just check no panic
+        let _ = extract(&html, &opts); // result may or may not have content; just check no panic
     }
 
     #[test]
@@ -452,7 +464,7 @@ mod tests {
                 </article>
             </body>
         </html>"#;
-        let result = extract(html, Options::default()).unwrap();
+        let result = extract(html, &Options::default()).unwrap();
         assert!(!result.metadata.title.is_empty(), "should extract title");
     }
 
@@ -462,7 +474,7 @@ mod tests {
             "<article><p>Content text that is long enough to pass all minimum size checks \
              and produce a non-empty HTML output in the result struct.</p></article>",
         );
-        let result = extract(&html, Options::default()).unwrap();
+        let result = extract(&html, &Options::default()).unwrap();
         assert!(
             !result.content_html.is_empty(),
             "content_html should be populated"
@@ -477,7 +489,7 @@ mod tests {
                     size threshold for the extraction algorithm.</p></article></body></html>";
         let mut opts = Options::default();
         opts.has_essential_metadata = true;
-        let result = extract(html, opts);
+        let result = extract(html, &opts);
         assert!(
             matches!(result, Err(TrafilaturaError::MissingMetadata(_))),
             "should fail: no URL in metadata"
@@ -497,7 +509,7 @@ mod tests {
         </html>"#;
         let mut opts = Options::default();
         opts.has_essential_metadata = true;
-        let result = extract(html, opts);
+        let result = extract(html, &opts);
         assert!(
             matches!(result, Err(TrafilaturaError::MissingMetadata(_))),
             "should fail: no date in metadata"
@@ -514,7 +526,7 @@ mod tests {
         );
         let mut opts = Options::default();
         opts.prune_selector = Some(".sidebar".into());
-        let result = extract(&html, opts).unwrap();
+        let result = extract(&html, &opts).unwrap();
         assert!(
             !result.content_text.contains("Remove this sidebar"),
             "pruned element should not appear in output"
@@ -534,7 +546,7 @@ mod tests {
         let html = simple_article(&many_ps);
         let mut opts = Options::default();
         opts.max_tree_size = Some(10); // tiny limit → should trigger TreeTooLarge
-        let result = extract(&html, opts);
+        let result = extract(&html, &opts);
         assert!(
             matches!(result, Err(TrafilaturaError::TreeTooLarge(_))),
             "should return TreeTooLarge when tree exceeds max_tree_size"
@@ -552,7 +564,7 @@ mod tests {
         );
         let mut opts = Options::default();
         opts.target_language = Some("zh".into()); // Chinese — definitely won't match
-        let result = extract(&html, opts);
+        let result = extract(&html, &opts);
         // Either the language was detected (and mismatched) or empty (and mismatched with "zh").
         // Either way, the result must be an error.
         assert!(

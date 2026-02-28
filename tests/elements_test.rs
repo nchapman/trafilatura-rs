@@ -31,7 +31,7 @@ fn test_table_simple() {
     let html = in_article(
         "<table><tr><td>cell1</td><td>cell2</td></tr><tr><td>cell3</td><td>cell4</td></tr></table>",
     );
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("cell1"),
         "content_text should contain cell1"
@@ -56,7 +56,7 @@ fn test_table_simple() {
 #[test]
 fn test_table_cell_with_p_children() {
     let html = in_article("<table><tr><td><p>text</p><p>more text</p></td></tr></table>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<p>text</p>"),
         "content_html should contain <p>text</p>, got: {}",
@@ -95,7 +95,7 @@ fn test_table_complex_with_links() {
         o.include_links = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_text.contains("text"),
         "content_text should contain 'text'"
@@ -112,7 +112,7 @@ fn test_table_complex_with_links() {
 #[test]
 fn test_table_cell_text_and_child() {
     let html = in_article("<table><tr><td>text<p>more text</p></td></tr></table>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("text"),
         "content_text should contain 'text'"
@@ -134,7 +134,7 @@ fn test_table_cell_text_and_child() {
 #[test]
 fn test_table_cell_with_link_no_links() {
     let html = in_article("<table><tr><td><a href='test'>link</a></td></tr></table>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("link"),
         "content_text should contain 'link', got: {}",
@@ -159,7 +159,7 @@ fn test_table_with_th_headers() {
         o.include_links = true;
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<th>Month</th>"),
         "content_html should contain <th>Month</th>, got: {}",
@@ -187,7 +187,7 @@ fn test_table_with_th_headers() {
 #[test]
 fn test_table_cell_with_mark_formatting() {
     let html = in_article("<table><tr><td><mark>highlighted text</mark></td></tr></table>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("highlighted text"),
         "content should contain 'highlighted text', got text: {}",
@@ -201,7 +201,7 @@ fn test_table_cell_with_mark_formatting() {
 #[test]
 fn test_table_cell_with_span_dropped() {
     let html = in_article("<table><tr><td><span style='sth'>span text</span></td></tr></table>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     // The span should be dropped; the cell may appear as an empty <p>
     assert!(
         !result.content_html.contains("<span"),
@@ -236,7 +236,7 @@ fn test_table_bold_in_cell() {
         o.include_links = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<b>Present Tense</b>"),
         "content_html should contain <b>Present Tense</b>, got: {}",
@@ -263,7 +263,7 @@ fn test_table_high_link_density_discarded() {
         o.include_links = true;
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     assert!(
         !result.content_text.contains("ABCD"),
         "content_text should NOT contain ABCD (high link density)"
@@ -284,7 +284,7 @@ fn test_table_nested_1() {
         o.include_links = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<th>1</th>"),
         "content_html should contain <th>1</th>, got: {}",
@@ -319,7 +319,7 @@ fn test_table_with_list_favor_recall() {
         o.focus = ExtractionFocus::FavorRecall;
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     assert!(
         result.content_text.contains("one"),
         "FavorRecall: content_text should contain 'one'"
@@ -336,7 +336,7 @@ fn test_table_with_list_favor_recall() {
 #[test]
 fn test_table_in_figure() {
     let html = "<html><body><article><figure><table><th>1</th><tr><td>2</td></tr></table></figure></article></body></html>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<th>1</th>"),
         "content_html should contain <th>1</th>, got: {}",
@@ -363,7 +363,7 @@ fn test_list_malformed() {
             <li>List item 3</li>
         </ul>",
     );
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     let count = result.content_text.matches("List item").count();
     assert_eq!(
         count, 3,
@@ -393,7 +393,7 @@ fn test_list_nested() {
             <li>Milk</li>
         </ul>
     </article></body></html>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("Coffee"),
         "content_text should contain 'Coffee'"
@@ -432,7 +432,7 @@ fn test_list_description() {
             <dd>White cold drink</dd>
         </dl>
     </article></body></html>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<dt>Coffee</dt>"),
         "content_html should contain <dt>Coffee</dt>, got: {}",
@@ -467,7 +467,7 @@ fn test_list_description() {
 #[test]
 fn test_list_item_with_br() {
     let html = in_article("<ul><li>text<br/>more text</li></ul>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("text"),
         "content_text should contain 'text', got: {}",
@@ -486,7 +486,7 @@ fn test_list_item_with_br() {
 #[test]
 fn test_list_text_outside_items() {
     let html = in_article("<ul>header<li>text</li></ul>");
-    let result = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("header"),
         "content_text should contain 'header'"
@@ -512,7 +512,7 @@ fn test_code_highlight_js() {
         "</code></pre>",
         "</div>",
     );
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result
             .content_html
@@ -540,7 +540,7 @@ fn test_code_github_pip_install() {
         r#"<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path>"#,
         "</svg></clipboard-copy></div></div>",
     );
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result
             .content_html
@@ -560,7 +560,7 @@ fn test_code_github_pip_install() {
 #[test]
 fn test_code_inline() {
     let html = "<div><p>paragraph</p><p>here is <code>some</code> code</p></div>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<code>some</code>"),
         "content_html should contain <code>some</code>, got: {}",
@@ -594,7 +594,7 @@ fn test_code_w3_schools() {
         r#"<span class="pythonkeywordcolor" style="color:mediumblue">print</span>(p1.age) "#,
         "</span></div></div>",
     );
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<code>"),
         "content_html should contain <code>, got: {}",
@@ -627,7 +627,7 @@ fn test_code_pre_with_lang_attr() {
             <span class=\"n\">openai_function</span>
         </pre>
     </div>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<code>"),
         "content_html should contain <code>, got: {}",
@@ -662,7 +662,7 @@ fn test_code_medium_js() {
             </span>
         </pre>
     </div>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<code>"),
         "content_html should contain <code>, got: {}",
@@ -688,7 +688,7 @@ fn test_code_medium_js() {
 #[test]
 fn test_code_pre_code_span() {
     let html = "<div><p>Code:</p><pre><code><span>my code</span></code></pre>";
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<code>my code</code>"),
         "content_html should contain <code>my code</code>, got: {}",

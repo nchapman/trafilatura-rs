@@ -149,7 +149,7 @@ fn main() {
 fn process_file(path: &str, opts: Options) -> Result<ExtractResult, String> {
     let html =
         std::fs::read_to_string(path).map_err(|e| format!("cannot read '{}': {}", path, e))?;
-    extract(&html, opts).map_err(|e| e.to_string())
+    extract(&html, &opts).map_err(|e| e.to_string())
 }
 
 fn process_url(cli: &Cli, url: url::Url, mut opts: Options) -> Result<ExtractResult, String> {
@@ -185,7 +185,7 @@ fn process_url(cli: &Cli, url: url::Url, mut opts: Options) -> Result<ExtractRes
         .map_err(|e| format!("failed to read response body: {}", e))?;
 
     opts.original_url = Some(url);
-    extract(&html, opts).map_err(|e| e.to_string())
+    extract(&html, &opts).map_err(|e| e.to_string())
 }
 
 fn process_stdin(opts: Options) -> Result<ExtractResult, String> {
@@ -193,7 +193,7 @@ fn process_stdin(opts: Options) -> Result<ExtractResult, String> {
     io::stdin()
         .read_to_string(&mut html)
         .map_err(|e| format!("failed to read stdin: {}", e))?;
-    extract(&html, opts).map_err(|e| e.to_string())
+    extract(&html, &opts).map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------

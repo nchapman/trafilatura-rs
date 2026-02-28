@@ -11,8 +11,13 @@ pub enum TrafilaturaError {
     #[error("wrong language: expected {expected}, got {got}")]
     LanguageMismatch { expected: String, got: String },
 
-    #[error("text and comments not long enough: {text_len} / {comment_len}")]
-    InsufficientContent { text_len: usize, comment_len: usize },
+    #[error("text and comments not long enough: {text_len}/{min_output_size} (text), {comment_len}/{min_output_comment_size} (comments)")]
+    InsufficientContent {
+        text_len: usize,
+        comment_len: usize,
+        min_output_size: usize,
+        min_output_comment_size: usize,
+    },
 
     #[error("missing required metadata: {0}")]
     MissingMetadata(String),

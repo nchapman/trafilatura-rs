@@ -81,7 +81,7 @@ fn bench_single_document(c: &mut Criterion) {
         let bytes = html.len() as u64;
         group.throughput(Throughput::Bytes(bytes));
         group.bench_with_input(BenchmarkId::new("extract", label), &html, |b, html| {
-            b.iter(|| trafilatura::extract(html, default_opts()))
+            b.iter(|| trafilatura::extract(html, &default_opts()))
         });
     }
 
@@ -105,7 +105,7 @@ fn bench_corpus(c: &mut Criterion) {
             || corpus.clone(),
             |docs| {
                 for html in docs {
-                    let _ = trafilatura::extract(&html, default_opts());
+                    let _ = trafilatura::extract(&html, &default_opts());
                 }
             },
             BatchSize::LargeInput,
@@ -139,7 +139,7 @@ fn bench_modes(c: &mut Criterion) {
             .with_focus(focus)
             .with_exclude_comments(true);
         group.bench_with_input(BenchmarkId::new("extract", label), &html, |b, html| {
-            b.iter(|| trafilatura::extract(html, opts.clone()))
+            b.iter(|| trafilatura::extract(html, &opts))
         });
     }
 

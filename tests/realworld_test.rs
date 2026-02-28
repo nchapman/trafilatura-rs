@@ -1329,7 +1329,7 @@ fn test_extract_exotic_tags() {
 
     // Misformed HTML declaration
     let html = r#"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 2012"http://www.w3.org/TR/html4/loose.dtd"><html><head></head><body><p>ABC</p></body></html>"#;
-    let result = trafilatura::extract(html, trafilatura::options::Options::default())
+    let result = trafilatura::extract(html, &trafilatura::options::Options::default())
         .expect("misformed doctype should still extract");
     assert!(result.content_text.contains("ABC"));
 
@@ -1343,12 +1343,12 @@ fn test_extract_exotic_tags() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(html, zero_opts).expect("naked div with br should extract");
+    let result = trafilatura::extract(html, &zero_opts).expect("naked div with br should extract");
     assert!(result.content_text.contains("1. 2. 3."));
 
     // HTML5 <details>/<summary>: both summary and body should be extracted
     let html = r#"<html><body><article><details><summary>Epcot Center</summary><p>Epcot is a theme park at Walt Disney World Resort featuring exciting attractions, international pavilions, award-winning fireworks and seasonal special events.</p></details></article></body></html>"#;
-    let result = trafilatura::extract(html, trafilatura::options::Options::default())
+    let result = trafilatura::extract(html, &trafilatura::options::Options::default())
         .expect("details element should extract");
     assert!(result.content_text.contains("Epcot Center"));
     assert!(result.content_text.contains("award-winning fireworks"));
@@ -1361,7 +1361,7 @@ fn test_extract_exotic_tags() {
         o.include_images = true;
         o
     };
-    let result = trafilatura::extract(html, opts).expect("empty-a inside strong should not crash");
+    let result = trafilatura::extract(html, &opts).expect("empty-a inside strong should not crash");
     assert!(!result.content_text.is_empty());
 
     // <em> improperly wrapping <p>: inner text must be extracted; result must end with "Text here"
@@ -1378,7 +1378,7 @@ fn test_extract_exotic_tags() {
             o.focus = focus;
             o
         };
-        let result = trafilatura::extract(html, opts)
+        let result = trafilatura::extract(html, &opts)
             .unwrap_or_else(|_| panic!("em-wrapping-p should extract (focus={focus:?})"));
         assert!(
             result

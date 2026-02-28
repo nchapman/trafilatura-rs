@@ -66,6 +66,50 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    /// Set the LRU cache size for duplicate detection.
+    pub fn with_cache_size(mut self, size: usize) -> Self {
+        self.cache_size = size;
+        self
+    }
+
+    /// Set the minimum text length before duplicate checking kicks in.
+    pub fn with_min_duplicate_check_size(mut self, size: usize) -> Self {
+        self.min_duplicate_check_size = size;
+        self
+    }
+
+    /// Set the maximum number of times a segment may appear before it is considered duplicate.
+    pub fn with_max_duplicate_count(mut self, count: usize) -> Self {
+        self.max_duplicate_count = count;
+        self
+    }
+
+    /// Set the minimum extracted text size (below this, fallback strategies are tried).
+    pub fn with_min_extracted_size(mut self, size: usize) -> Self {
+        self.min_extracted_size = size;
+        self
+    }
+
+    /// Set the minimum extracted comment size.
+    pub fn with_min_extracted_comment_size(mut self, size: usize) -> Self {
+        self.min_extracted_comment_size = size;
+        self
+    }
+
+    /// Set the minimum output text size (below this, `InsufficientContent` is returned).
+    pub fn with_min_output_size(mut self, size: usize) -> Self {
+        self.min_output_size = size;
+        self
+    }
+
+    /// Set the minimum output comment size.
+    pub fn with_min_output_comment_size(mut self, size: usize) -> Self {
+        self.min_output_comment_size = size;
+        self
+    }
+}
+
 /// Options for content extraction.
 ///
 /// All fields default to sensible values via [`Default`]. The most commonly
@@ -104,7 +148,7 @@ pub struct Options {
     /// Preserve `<a>` tags (hyperlinks) in output HTML.
     pub include_links: bool,
     /// Author names to exclude from metadata results.
-    pub blacklisted_authors: Vec<String>,
+    pub excluded_authors: Vec<String>,
     /// Enable cross-document duplicate detection via LRU cache.
     pub deduplicate: bool,
     /// Require title, URL, and date in metadata or return an error.
@@ -219,8 +263,8 @@ impl Options {
     }
 
     /// Set author names to exclude from metadata results.
-    pub fn with_blacklisted_authors(mut self, authors: Vec<String>) -> Self {
-        self.blacklisted_authors = authors;
+    pub fn with_excluded_authors(mut self, authors: Vec<String>) -> Self {
+        self.excluded_authors = authors;
         self
     }
 

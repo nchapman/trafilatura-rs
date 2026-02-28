@@ -97,7 +97,7 @@ fn comparison_detail() {
             o
         };
 
-        let text = trafilatura::extract(&html, opts)
+        let text = trafilatura::extract(&html, &opts)
             .map(|r| r.content_text)
             .unwrap_or_default();
 

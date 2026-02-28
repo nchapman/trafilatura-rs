@@ -30,7 +30,7 @@ let html = r#"<html><body>
   <footer>Copyright 2024</footer>
 </body></html>"#;
 
-let result = extract(html, Options::default()).unwrap();
+let result = extract(html, &Options::default()).unwrap();
 println!("{}", result.content_text);   // "This is the main article content."
 println!("{}", result.metadata.title); // extracted <title> or og:title
 ```
@@ -45,7 +45,7 @@ let opts = Options::default()
     .with_links(true)                 // preserve <a> tags in HTML output
     .with_focus(ExtractionFocus::FavorRecall); // extract more content
 
-let result = extract(html, opts).unwrap();
+let result = extract(html, &opts).unwrap();
 ```
 
 ### CLI

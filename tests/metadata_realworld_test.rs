@@ -124,7 +124,7 @@ fn get_metadata(url: &str) -> Metadata {
     if let Ok(parsed) = url::Url::parse(url) {
         opts.original_url = Some(parsed);
     }
-    trafilatura::extract(&html, opts)
+    trafilatura::extract(&html, &opts)
         .unwrap_or_else(|e| panic!("extraction failed for {url}: {e}"))
         .metadata
 }

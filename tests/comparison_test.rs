@@ -185,7 +185,7 @@ fn run_comparison(title: &str, enable_fallback: bool, focus: ExtractionFocus) ->
             o
         };
 
-        let result = trafilatura::extract(&html, opts)
+        let result = trafilatura::extract(&html, &opts)
             .map(|r| r.content_text)
             .unwrap_or_default();
 

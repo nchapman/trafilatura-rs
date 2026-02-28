@@ -24,14 +24,14 @@ fn html_doc(body: &str) -> String {
 
 /// Run extraction and return `content_html` on success.
 fn extract_html(html: &str, opts: Options) -> Option<String> {
-    trafilatura::extract(html, opts)
+    trafilatura::extract(html, &opts)
         .ok()
         .map(|r| r.content_html)
 }
 
 /// Run extraction and return `content_text` on success.
 fn extract_text(html: &str, opts: Options) -> Option<String> {
-    trafilatura::extract(html, opts)
+    trafilatura::extract(html, &opts)
         .ok()
         .map(|r| r.content_text)
 }
@@ -153,7 +153,7 @@ fn test_formatting_nested_bold_italic() {
 fn test_formatting_empty_tags_produce_empty_body() {
     let html = html_doc("<p><b><i></i></b></p>");
     // extract() may return Err(InsufficientContent) or Ok with empty content.
-    let content_html = match trafilatura::extract(&html, zero_opts()) {
+    let content_html = match trafilatura::extract(&html, &zero_opts()) {
         Ok(r) => r.content_html,
         Err(_) => String::new(),
     };
@@ -167,7 +167,7 @@ fn test_formatting_empty_tags_produce_empty_body() {
 #[test]
 fn test_formatting_wild_div_with_strong() {
     let html = html_doc("<article><div><strong>Wild text</strong></div></article>");
-    let result = trafilatura::extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = trafilatura::extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<p>"),
         "wild div content should be wrapped in <p>; got: {}",
@@ -288,7 +288,7 @@ fn test_formatting_within_p_no_links() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&raw_html, opts).expect("extraction should succeed");
+    let result = trafilatura::extract(&raw_html, &opts).expect("extraction should succeed");
     // All words must be present in content_text (even if punctuation spacing differs).
     assert!(
         result.content_text.contains("bold"),
@@ -355,7 +355,7 @@ fn test_formatting_br_after_strong_produces_newline() {
         "<article><p><strong>Staff Review of the Financial Situation</strong><br>Domestic \
          financial conditions remained accommodative over the intermeeting period.</p></article>",
     );
-    let result = trafilatura::extract(&html, zero_opts()).expect("extraction should succeed");
+    let result = trafilatura::extract(&html, &zero_opts()).expect("extraction should succeed");
     // Both text fragments must be present.
     assert!(
         result
@@ -445,7 +445,7 @@ fn test_filters_max_tree_size_50_p_passes() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(result.is_ok(), "50 paragraphs should pass MaxTreeSize=500");
 }
 
@@ -463,7 +463,7 @@ fn test_filters_max_tree_size_501_p_fails() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         matches!(result, Err(TrafilaturaError::TreeTooLarge(_))),
         "501 paragraphs should trigger TreeTooLarge; got: {result:?}"
@@ -486,7 +486,7 @@ fn test_filters_max_tree_size_501_p_italic_fails() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         matches!(result, Err(TrafilaturaError::TreeTooLarge(_))),
         "501 italic paragraphs should trigger TreeTooLarge; got: {result:?}"
@@ -507,7 +507,7 @@ fn test_filters_max_tree_size_499_p_italic_passes() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         result.is_ok(),
         "499 italic paragraphs should pass MaxTreeSize=500; got: {result:?}"
@@ -547,7 +547,7 @@ fn test_filters_lang_detection_english_content_target_de() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         matches!(result, Err(TrafilaturaError::LanguageMismatch { .. })),
         "English content with target 'de' should be rejected; got: {result:?}"
@@ -568,7 +568,7 @@ fn test_filters_lang_detection_english_content_target_en() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         result.is_ok(),
         "English content with target 'en' should pass; got: {result:?}"
@@ -590,7 +590,7 @@ fn test_filters_lang_english_html_lang_target_de_blocked() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         matches!(result, Err(TrafilaturaError::LanguageMismatch { .. })),
         "English content with target 'de' should be rejected; got: {result:?}"
@@ -612,7 +612,7 @@ fn test_filters_lang_english_html_lang_target_en_passes() {
         o.config = c;
         o
     };
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         result.is_ok(),
         "English content with target 'en' should pass; got: {result:?}"
@@ -637,7 +637,7 @@ fn test_filters_lang_de_html_lang_but_english_content_target_de() {
     // The html[lang] attribute says "de" but the actual content is English.
     // In non-strict mode, html[lang] is not checked at the early stage, so extraction
     // proceeds to content classification, which detects English → mismatch.
-    let result = trafilatura::extract(&html, opts);
+    let result = trafilatura::extract(&html, &opts);
     assert!(
         matches!(result, Err(TrafilaturaError::LanguageMismatch { .. })),
         "German html lang but English content with target 'de' should be rejected; got: {result:?}"

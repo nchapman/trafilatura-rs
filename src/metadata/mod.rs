@@ -296,11 +296,11 @@ static DATE_NO_SEP_RE: LazyLock<Regex> =
 pub fn extract_metadata(doc: &Document, opts: &Options) -> Metadata {
     // Extract from <meta> tags (includes OpenGraph).
     let mut metadata = examine_meta(doc);
-    metadata.author = remove_blacklisted_authors(&metadata.author, opts);
+    metadata.author = remove_excluded_authors(&metadata.author, opts);
 
     // Extract from JSON-LD and override.
     metadata = json_ld::extract_json_ld(opts, doc, metadata);
-    metadata.author = remove_blacklisted_authors(&metadata.author, opts);
+    metadata.author = remove_excluded_authors(&metadata.author, opts);
 
     // Title fallback via DOM selectors.
     if metadata.title.is_empty() {
@@ -310,7 +310,7 @@ pub fn extract_metadata(doc: &Document, opts: &Options) -> Metadata {
     // Author fallback via DOM selectors.
     if metadata.author.is_empty() {
         metadata.author = extract_dom_author(doc);
-        metadata.author = remove_blacklisted_authors(&metadata.author, opts);
+        metadata.author = remove_excluded_authors(&metadata.author, opts);
     }
 
     // URL fallback via canonical link.
@@ -938,14 +938,14 @@ pub(crate) fn normalize_authors(authors: &str, input: &str) -> String {
     list_author.join("; ")
 }
 
-/// Port of `removeBlacklistedAuthors`.
-pub(crate) fn remove_blacklisted_authors(current: &str, opts: &Options) -> String {
-    if current.is_empty() || opts.blacklisted_authors.is_empty() {
+/// Port of `removeBlacklistedAuthors` (renamed to `remove_excluded_authors`).
+pub(crate) fn remove_excluded_authors(current: &str, opts: &Options) -> String {
+    if current.is_empty() || opts.excluded_authors.is_empty() {
         return current.to_string();
     }
 
-    let blacklisted: HashSet<String> = opts
-        .blacklisted_authors
+    let excluded: HashSet<String> = opts
+        .excluded_authors
         .iter()
         .map(|a| a.to_lowercase())
         .collect();
@@ -953,7 +953,7 @@ pub(crate) fn remove_blacklisted_authors(current: &str, opts: &Options) -> Strin
     let allowed: Vec<&str> = current
         .split(';')
         .map(|a| a.trim())
-        .filter(|a| !blacklisted.contains(&a.to_lowercase()))
+        .filter(|a| !excluded.contains(&a.to_lowercase()))
         .collect();
 
     if !allowed.is_empty() {
@@ -1429,16 +1429,16 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------------
-    // remove_blacklisted_authors
+    // remove_excluded_authors
     // ---------------------------------------------------------------------------
 
     #[test]
-    fn test_remove_blacklisted_authors() {
+    fn test_remove_excluded_authors() {
         let opts = Options {
-            blacklisted_authors: vec!["Staff Reporter".to_string()],
+            excluded_authors: vec!["Staff Reporter".to_string()],
             ..Default::default()
         };
-        let result = remove_blacklisted_authors("Staff Reporter; Jane Doe", &opts);
+        let result = remove_excluded_authors("Staff Reporter; Jane Doe", &opts);
         assert!(!result.contains("Staff Reporter"));
         assert!(result.contains("Jane Doe"));
     }

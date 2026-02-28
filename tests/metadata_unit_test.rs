@@ -154,7 +154,7 @@ fn test_metadata_titles() {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Test_Metadata_Authors — head and body author extraction + blacklist
+// Test_Metadata_Authors — head and body author extraction + exclude list
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -382,16 +382,16 @@ fn test_metadata_authors_from_body() {
 }
 
 #[test]
-fn test_metadata_authors_blacklist() {
-    // Blacklisted author should be removed
+fn test_metadata_authors_exclude_list() {
+    // Excluded author should be removed
     let html =
         r#"<html><head><meta itemprop="author" content="Jenny Smith"/></head><body></body></html>"#;
     let mut opts = Options::default();
-    opts.blacklisted_authors = vec!["Jenny Smith".to_string()];
+    opts.excluded_authors = vec!["Jenny Smith".to_string()];
     assert_eq!("", get_metadata_with_opts(html, opts).author);
 
-    // removeBlacklistedAuthors: case-insensitive matching
-    // "a; B; c; d" with blacklist ["A", "b"] → "c; d"
+    // removeExcludedAuthors: case-insensitive matching
+    // "a; B; c; d" with exclude list ["A", "b"] → "c; d"
     // Test via full pipeline:
     let html = r#"<html><head>
         <meta itemprop="author" content="a"/>
@@ -400,9 +400,9 @@ fn test_metadata_authors_blacklist() {
         <meta itemprop="author" content="d"/>
     </head><body></body></html>"#;
     let mut opts = Options::default();
-    opts.blacklisted_authors = vec!["A".to_string(), "b".to_string()];
+    opts.excluded_authors = vec!["A".to_string(), "b".to_string()];
     // Single-word authors won't pass validate_metadata_name, so they'll be empty.
-    // This behavior differs from Go which tests removeBlacklistedAuthors directly.
+    // This behavior differs from Go which tests removeExcludedAuthors directly.
     // We test what we can via the public API.
     let _ = get_metadata_with_opts(html, opts); // just verify no panic
 }

@@ -23,7 +23,7 @@ fn zero_opts() -> Options {
     o
 }
 
-fn extract(html: &str, opts: Options) -> Option<ExtractResult> {
+fn extract(html: &str, opts: &Options) -> Option<ExtractResult> {
     trafilatura::extract(html, opts).ok()
 }
 
@@ -50,7 +50,7 @@ fn test_paywall_removal() {
         o
     };
     let html = r#"<html><body><main><p>1</p><p id="premium">2</p><p>3</p></main></body></html>"#;
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert_eq!("1 3", result.content_text);
 }
 
@@ -62,7 +62,7 @@ fn test_paywall_removal() {
 #[test]
 fn test_exotic_misformed_html() {
     let html = r#"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 2012"http://www.w3.org/TR/html4/loose.dtd"><html><head></head><body><p>ABC</p></body></html>"#;
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("ABC"),
         "Expected 'ABC' in content, got: {:?}",
@@ -79,7 +79,7 @@ fn test_exotic_empty_blockquote() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts);
+    let result = extract(html, &opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert!(
         text.is_empty(),
@@ -96,7 +96,7 @@ fn test_exotic_empty_table() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts);
+    let result = extract(html, &opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert!(
         text.is_empty(),
@@ -114,7 +114,7 @@ fn test_exotic_nested_p() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_text.contains("1st part"),
         "Expected '1st part' in content, got: {:?}",
@@ -136,7 +136,7 @@ fn test_exotic_details_summary() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_text.contains("Epcot Center"),
         "Expected 'Epcot Center' in content, got: {:?}",
@@ -177,7 +177,7 @@ fn test_exotic_strong_empty_anchor() {
         o.include_images = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         !result.content_text.is_empty(),
         "Expected non-empty content, got empty"
@@ -220,7 +220,7 @@ fn test_exotic_em_wrapping_p() {
             o.focus = focus;
             o
         };
-        let result = extract(html, opts).expect("extraction should succeed");
+        let result = extract(html, &opts).expect("extraction should succeed");
         assert!(
             result
                 .content_text
@@ -249,7 +249,7 @@ fn test_images_excluded_by_default() {
         o.config = zero_config();
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     assert!(
         !result
             .content_html
@@ -268,7 +268,7 @@ fn test_images_included_when_opted_in() {
         o.include_images = true;
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     // The scraper serializer may reorder attributes and drop the XML self-closing slash.
     assert!(
         result.content_html.contains("test.jpg") && result.content_html.contains("<img"),
@@ -287,7 +287,7 @@ fn test_images_data_src_promoted() {
         o.include_images = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     // data-src must be promoted to src; attribute order may vary.
     assert!(
         result.content_html.contains(r#"src="test.jpg""#) && result.content_html.contains("<img"),
@@ -306,7 +306,7 @@ fn test_images_data_src_small_promoted() {
         o.include_images = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     // data-src-small must be promoted to src; attribute order may vary.
     assert!(
         result.content_html.contains(r#"src="test.jpg""#) && result.content_html.contains("<img"),
@@ -325,7 +325,7 @@ fn test_images_no_valid_src_attr() {
         o.include_images = true;
         o
     };
-    let result = extract(html, opts);
+    let result = extract(html, &opts);
     // Image-only content with no valid src → extraction returns nothing.
     let html_out = result.map(|r| r.content_html).unwrap_or_default();
     assert!(
@@ -344,7 +344,7 @@ fn test_images_data_uri_rejected() {
         o.include_images = true;
         o
     };
-    let result = extract(html, opts);
+    let result = extract(html, &opts);
     // data: URI images are rejected — result is empty (None or empty body).
     let html_out = result.map(|r| r.content_html).unwrap_or_default();
     assert!(
@@ -363,7 +363,7 @@ fn test_images_nested_div_data_src() {
         o.include_images = true;
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     // Attribute order may vary; verify src is promoted.
     assert!(
         result.content_html.contains(r#"src="test.jpg""#) && result.content_html.contains("<img"),
@@ -381,7 +381,7 @@ fn test_images_nested_div_data_src() {
 fn test_links_excluded_by_default() {
     let html = r#"<html><body><p><a href="testlink.html">Test link text.</a>This part of the text has to be long enough.</p></body></html>"#;
     let opts = zero_opts();
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         !result.content_html.contains("testlink.html"),
         "href should not appear when include_links=false"
@@ -398,7 +398,7 @@ fn test_links_included_when_opted_in() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result
             .content_html
@@ -421,7 +421,7 @@ fn test_links_high_density_excluded_precision() {
         o.focus = ExtractionFocus::FavorPrecision;
         o
     };
-    let result = extract(&html, opts);
+    let result = extract(&html, &opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert!(
         text.is_empty(),
@@ -442,7 +442,7 @@ fn test_links_high_density_included_balanced() {
         o.focus = ExtractionFocus::Balanced;
         o
     };
-    let result = extract(&html, opts);
+    let result = extract(&html, &opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert!(
         text.contains("abcd"),
@@ -460,7 +460,7 @@ fn test_links_without_href() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<a>Test link text.</a>"),
         "Anchor without href should be preserved; html was: {}",
@@ -478,7 +478,7 @@ fn test_links_various_positions() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_text.contains('1'),
         "Expected '1' in content text, got: {:?}",
@@ -501,7 +501,7 @@ fn test_links_various_positions() {
 fn test_links_from_fixture() {
     let html = read_simple_fixture("http_sample.html");
 
-    let result_no_links = extract(&html, zero_opts()).expect("extraction should succeed");
+    let result_no_links = extract(&html, &zero_opts()).expect("extraction should succeed");
     assert!(
         !result_no_links.content_html.contains("testlink.html"),
         "testlink.html should not appear when include_links=false"
@@ -513,7 +513,7 @@ fn test_links_from_fixture() {
         o.config = zero_config();
         o
     };
-    let result_with_links = extract(&html, opts_with_links).expect("extraction should succeed");
+    let result_with_links = extract(&html, &opts_with_links).expect("extraction should succeed");
     assert!(
         result_with_links.content_html.contains("testlink.html"),
         "testlink.html should appear when include_links=true; html was: {}",
@@ -531,7 +531,7 @@ fn test_links_license_rel_stripped() {
         o.config = zero_config();
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<a>CC BY-SA license</a>"),
         "License links should have href stripped; html was: {}",
@@ -551,7 +551,7 @@ fn test_links_relative_url_conversion() {
         o.original_url = Some(original_url);
         o
     };
-    let result = extract(html, opts).expect("extraction should succeed");
+    let result = extract(html, &opts).expect("extraction should succeed");
     assert!(
         result
             .content_html
@@ -577,7 +577,7 @@ fn prune_opts(selector: &str) -> Options {
 #[test]
 fn test_prune_selector_all_p_removed() {
     let html = format!("<html><body>{}</body></html>", "<p>abc</p>".repeat(50));
-    let result = extract(&html, prune_opts("p"));
+    let result = extract(&html, &prune_opts("p"));
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert_eq!("", text, "All <p> elements should be pruned, got: {text:?}");
 }
@@ -594,7 +594,7 @@ fn test_prune_selector_p_keeps_h1() {
         "<html><body><h1>ABC</h1>{}</body></html>",
         "<p>abc</p>".repeat(50)
     );
-    let result = extract(&html, prune_opts("p")).expect("extraction should succeed");
+    let result = extract(&html, &prune_opts("p")).expect("extraction should succeed");
     assert_eq!(
         "ABC", result.content_text,
         "Only h1 text should remain after pruning <p>"
@@ -608,7 +608,7 @@ fn test_prune_selector_p_and_h1_empty() {
         "<html><body><h1>ABC</h1>{}</body></html>",
         "<p>abc</p>".repeat(50)
     );
-    let result = extract(&html, prune_opts("p, h1"));
+    let result = extract(&html, &prune_opts("p, h1"));
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert_eq!(
         "", text,
@@ -623,7 +623,7 @@ fn test_prune_selector_p_and_h1_keeps_h2() {
         "<html><body><h1>ABC</h1><h2>42</h2>{}</body></html>",
         "<p>abc</p>".repeat(50)
     );
-    let result = extract(&html, prune_opts("p, h1")).expect("extraction should succeed");
+    let result = extract(&html, &prune_opts("p, h1")).expect("extraction should succeed");
     assert_eq!(
         "42", result.content_text,
         "Only h2 text should remain after pruning p and h1"
@@ -643,7 +643,7 @@ fn test_external_exclude_tables_false() {
         o.exclude_tables = false;
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     assert!(
         result.content_text.contains("localhost:80"),
         "Table content should be present when exclude_tables=false; text was: {}",
@@ -660,7 +660,7 @@ fn test_external_exclude_tables_true() {
         o.exclude_tables = true;
         o
     };
-    let result = extract(&html, opts);
+    let result = extract(&html, &opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert!(
         !text.contains("localhost:80"),
@@ -678,7 +678,7 @@ fn test_external_scam_no_fallback_empty() {
         o.config = zero_config();
         o
     };
-    let result = extract(&html, opts);
+    let result = extract(&html, &opts);
     let text = result.map(|r| r.content_text).unwrap_or_default();
     assert!(
         text.is_empty(),
@@ -703,7 +703,7 @@ fn test_external_scam_with_fallback_nonempty() {
         o.config = zero_config();
         o
     };
-    let result = extract(&html, opts).expect("extraction should succeed");
+    let result = extract(&html, &opts).expect("extraction should succeed");
     assert!(
         !result.content_text.is_empty(),
         "scam.html with fallback should yield non-empty content"
@@ -728,7 +728,7 @@ fn test_external_scam_with_fallback_nonempty() {
 #[test]
 fn test_non_std_html_entities() {
     let html = r#"<html><body><p>Text &customentity; more text</p></body></html>"#;
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert_eq!(
         "Text &customentity; more text", result.content_text,
         "Non-standard entity should round-trip unchanged"
@@ -744,7 +744,7 @@ fn test_non_std_html_entities() {
 fn test_mixed_content_extraction() {
     let html =
         r#"<html><body><p>Text here</p><img src="img.jpg"/><video src="video.mp4"/></body></html>"#;
-    let result = extract(html, zero_opts()).expect("extraction should succeed");
+    let result = extract(html, &zero_opts()).expect("extraction should succeed");
     assert_eq!(
         "Text here", result.content_text,
         "Only text should be extracted from mixed content"
@@ -763,5 +763,5 @@ fn test_large_doc_performance() {
         "<p>Sample text</p>".repeat(1000)
     );
     // We simply verify the call returns (no timeout needed in Rust tests).
-    let _ = extract(&html, zero_opts());
+    let _ = extract(&html, &zero_opts());
 }

@@ -70,7 +70,7 @@ pub fn extract_mock_file(url: &str, include_links: bool) -> Option<ExtractResult
     if let Ok(parsed) = url::Url::parse(url) {
         opts.original_url = Some(parsed);
     }
-    trafilatura::extract(&html, opts).ok()
+    trafilatura::extract(&html, &opts).ok()
 }
 
 /// True when the text appears in content_text or comments_text.
