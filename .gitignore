@@ -1,2 +1,4 @@
 /target
 *.json.gz
+.venv*/
+__pycache__/

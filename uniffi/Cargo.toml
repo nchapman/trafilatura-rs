@@ -1,0 +1,24 @@
+[package]
+name = "trafilatura-uniffi"
+version = "0.2.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+name = "trafilatura_uniffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["cli"]
+
+[features]
+cli = ["uniffi/cli"]
+
+[dependencies]
+uniffi = "0.31"
+thiserror = "2"
+trafilatura = { path = ".." }
+url = "2"
+chrono = "0.4"

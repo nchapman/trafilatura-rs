@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "trafilatura-uniffi"
+requires-python = ">=3.8"
+dynamic = ["version"]
+
+[tool.maturin]
+manifest-path = "uniffi/Cargo.toml"
+bindings = "uniffi"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/bindings/python"]

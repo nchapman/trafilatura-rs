@@ -1,0 +1,8 @@
+[bindings.kotlin]
+package_name = "uniffi.trafilatura_uniffi"
+cdylib_name  = "trafilatura_uniffi"
+
+[bindings.swift]
+module_name  = "Trafilatura"
+ffi_module_name = "trafilatura_uniffiFFI"
+cdylib_name  = "trafilatura_uniffi"
