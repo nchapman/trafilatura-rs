@@ -1,7 +1,7 @@
 // Port of go-trafilatura/internal/etree/element.go and etree.go
 
 use ego_tree::NodeId;
-use html5ever::{LocalName, QualName, namespace_url, ns};
+use html5ever::{LocalName, QualName, ns};
 use scraper::Node;
 use scraper::node::{Element, Text};
 use tendril::StrTendril;

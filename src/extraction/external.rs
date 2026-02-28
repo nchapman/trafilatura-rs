@@ -160,7 +160,7 @@ fn create_fallback_generators(cleaned_html: &str, opts: &Options) -> Vec<Fallbac
 ///
 /// Port of the readability generator in `createFallbackGenerators`.
 fn generate_readability_candidate(html: &str) -> Option<Document> {
-    let mut parser = readability::Parser::new();
+    let mut parser = libreadability::Parser::new();
     let article = parser.parse(html, None).ok()?;
 
     if article.content.is_empty() {

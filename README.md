@@ -1,5 +1,9 @@
 # trafilatura
 
+[![Crates.io](https://img.shields.io/crates/v/trafilatura.svg)](https://crates.io/crates/trafilatura)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Rust: 1.80+](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
+
 Extract readable content, comments, and metadata from web pages.
 
 A Rust port of [go-trafilatura](https://github.com/markusmobius/go-trafilatura),
@@ -36,12 +40,10 @@ println!("{}", result.metadata.title); // extracted <title> or og:title
 ```rust
 use trafilatura::{extract, Options, ExtractionFocus};
 
-let opts = Options {
-    enable_fallback: true,           // use readability fallback
-    include_links: true,             // preserve <a> tags in HTML output
-    focus: ExtractionFocus::FavorRecall, // extract more content
-    ..Options::default()
-};
+let opts = Options::default()
+    .with_fallback(true)              // use readability fallback
+    .with_links(true)                 // preserve <a> tags in HTML output
+    .with_focus(ExtractionFocus::FavorRecall); // extract more content
 
 let result = extract(html, opts).unwrap();
 ```

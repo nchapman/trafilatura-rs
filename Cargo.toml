@@ -5,6 +5,10 @@ edition = "2021"
 rust-version = "1.80"
 description = "Extract readable content, comments, and metadata from web pages"
 license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/nchapman/trafilatura-rs"
+keywords = ["trafilatura", "extraction", "html", "scraping", "content"]
+categories = ["parser-implementations", "text-processing", "web-programming"]
 
 [lib]
 name = "trafilatura"
@@ -23,11 +27,11 @@ chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"], optional = true }
 reqwest = { version = "0.12", features = ["blocking"], optional = true }
 ego-tree = "0.10"
-html5ever = "0.29"
+html5ever = "0.36"
 justext = { path = "../justext-rs" }
-readability = { path = "../readability-rs" }
+libreadability = { path = "../readability-rs" }
 regex = "1"
-scraper = "0.22"
+scraper = "0.25"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tendril = "0.4"
@@ -36,12 +40,12 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", optional = true }
 unicode-normalization = "0.1"
 url = "2"
-whatlang = "0.16"
+whatlang = "0.18"
 
 [dev-dependencies]
 encoding_rs = "0.8"
 pretty_assertions = "1"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name = "extraction"

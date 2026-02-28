@@ -79,6 +79,7 @@ fn to_iso639_1(lang: Lang) -> &'static str {
         Lang::Vie => "vi",
         Lang::Yid => "yi",
         Lang::Zul => "zu",
+        Lang::Cym => "cy",
     }
 }
 
