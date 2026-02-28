@@ -16,7 +16,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-trafilatura = "0.1"
+trafilatura = "0.2"
 ```
 
 ### Library
