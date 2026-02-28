@@ -139,7 +139,9 @@ fn overall_discarded_content_rule1(doc: &Document, id: NodeId) -> bool {
         || contains(&elem_id, "bmdh")
         || contains(&class, "slide")
         || contains(&class, "viewport")
-        || doc.get_attribute(id, "data-lp-replacement-content").is_some()
+        || doc
+            .get_attribute(id, "data-lp-replacement-content")
+            .is_some()
         || contains(&elem_id, "premium")
         || contains(&class, "overlay")
         || contains(&class, "paid-content")

@@ -35,7 +35,12 @@ pub(crate) fn text_chars_test(s: &str) -> bool {
 /// Always increments the count in the cache when the text is long enough.
 ///
 /// Port of `duplicateTest`.
-pub(crate) fn duplicate_test(doc: &Document, id: NodeId, cache: &mut LruCache, opts: &Options) -> bool {
+pub(crate) fn duplicate_test(
+    doc: &Document,
+    id: NodeId,
+    cache: &mut LruCache,
+    opts: &Options,
+) -> bool {
     let test_string = trim(&doc.iter_text(id, " "));
 
     if test_string.chars().count() > opts.config.min_duplicate_check_size {
@@ -122,7 +127,8 @@ mod tests {
             ..Options::default()
         };
         let mut cache = LruCache::new(100);
-        let (doc, id) = make_doc_with_text("p", "This is a unique sentence with enough characters.");
+        let (doc, id) =
+            make_doc_with_text("p", "This is a unique sentence with enough characters.");
         assert!(!duplicate_test(&doc, id, &mut cache, &opts));
     }
 
@@ -147,7 +153,7 @@ mod tests {
         assert!(!duplicate_test(&doc, id, &mut cache, &opts)); // count: 0→1
         assert!(!duplicate_test(&doc, id, &mut cache, &opts)); // count: 1→2
         assert!(!duplicate_test(&doc, id, &mut cache, &opts)); // count: 2→3 (2 > 2 is false)
-        assert!(duplicate_test(&doc, id, &mut cache, &opts));  // count: 3 > 2 → duplicate
+        assert!(duplicate_test(&doc, id, &mut cache, &opts)); // count: 3 > 2 → duplicate
     }
 
     #[test]

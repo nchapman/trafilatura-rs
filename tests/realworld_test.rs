@@ -15,7 +15,8 @@ use common::{extract_mock_file, html_contains, res_contains};
 ///  readability/domdistiller fallback generators that Go has.)
 #[test]
 fn test_extract_die_partei() {
-    let url = "https://die-partei.net/luebeck/2012/05/31/das-ministerium-fur-club-kultur-informiert/";
+    let url =
+        "https://die-partei.net/luebeck/2012/05/31/das-ministerium-fur-club-kultur-informiert/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(!res_contains(&result, "Impressum"));
     assert!(res_contains(&result, "Die GEMA dreht völlig am Zeiger!"));
@@ -26,7 +27,10 @@ fn test_extract_bmjv() {
     let url = "https://www.bmjv.de/DE/Verbraucherportal/KonsumImAlltag/TransparenzPreisanpassung/TransparenzPreisanpassung_node.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(!res_contains(&result, "Impressum"));
-    assert!(res_contains(&result, "Anbieter von Fernwärme haben innerhalb ihres Leitungsnetzes ein Monopol"));
+    assert!(res_contains(
+        &result,
+        "Anbieter von Fernwärme haben innerhalb ihres Leitungsnetzes ein Monopol"
+    ));
 }
 
 #[test]
@@ -35,7 +39,10 @@ fn test_extract_denkanstoos() {
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Two or three 10-15 min"));
     assert!(res_contains(&result, "What type? Etc. (30 mins)"));
-    assert!(!res_contains(&result, "Dieser Eintrag wurde veröffentlicht"));
+    assert!(!res_contains(
+        &result,
+        "Dieser Eintrag wurde veröffentlicht"
+    ));
     assert!(!res_contains(&result, "Mit anderen Teillen"));
 }
 
@@ -46,7 +53,10 @@ fn test_extract_ebrosia() {
     assert!(res_contains(&result, "Das Bukett präsentiert sich"));
     assert!(!res_contains(&result, "Kunden kauften auch"));
     assert!(!res_contains(&result, "Gutschein sichern"));
-    assert!(res_contains(&result, "Besonders gut passt er zu asiatischen Gerichten"));
+    assert!(res_contains(
+        &result,
+        "Besonders gut passt er zu asiatischen Gerichten"
+    ));
 }
 
 #[test]
@@ -57,7 +67,10 @@ fn test_extract_landwirt() {
     assert!(res_contains(&result, "tragbaren Ultraschall-Geräten"));
     assert!(res_contains(&result, "Kotkonsistenz"));
     assert!(!res_contains(&result, "Anzeigentarife"));
-    assert!(!res_contains(&result, "Aktuelle Berichte aus dieser Kategorie"));
+    assert!(!res_contains(
+        &result,
+        "Aktuelle Berichte aus dieser Kategorie"
+    ));
 }
 
 #[test]
@@ -92,7 +105,10 @@ fn test_extract_love_hina() {
 fn test_extract_cdu_fraktion_erfurt() {
     let url = "http://www.cdu-fraktion-erfurt.de/inhalte/aktuelles/entwicklung-der-waldorfschule-ermoeglicht/index.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "der steigenden Nachfrage gerecht zu werden."));
+    assert!(res_contains(
+        &result,
+        "der steigenden Nachfrage gerecht zu werden."
+    ));
     assert!(!res_contains(&result, "Zurück zur Übersicht"));
     assert!(!res_contains(&result, "Erhöhung für Zoo-Eintritt"));
 }
@@ -109,8 +125,14 @@ fn test_extract_creativecommons() {
 fn test_extract_piratenpartei() {
     let url = "https://piratenpartei-mv.de/blog/2013/09/12/grundeinkommen-ist-ein-menschenrecht/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Unter diesem Motto findet am 14. September"));
-    assert!(res_contains(&result, "Volksinitiative Schweiz zum Grundeinkommen."));
+    assert!(res_contains(
+        &result,
+        "Unter diesem Motto findet am 14. September"
+    ));
+    assert!(res_contains(
+        &result,
+        "Volksinitiative Schweiz zum Grundeinkommen."
+    ));
     assert!(!res_contains(&result, "getaggt mit:"));
     assert!(!res_contains(&result, "Was denkst du?"));
 }
@@ -128,7 +150,10 @@ fn test_extract_wehranlage_horka() {
     let url = "http://www.wehranlage-horka.de/veranstaltung/887/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "In eine andere Zeit"));
-    assert!(res_contains(&result, "Während Sie über den Markt schlendern"));
+    assert!(res_contains(
+        &result,
+        "Während Sie über den Markt schlendern"
+    ));
     assert!(!res_contains(&result, "Infos zum Verein"));
     assert!(!res_contains(&result, "nach oben"));
     assert!(!res_contains(&result, "Datenschutzerklärung"));
@@ -136,7 +161,8 @@ fn test_extract_wehranlage_horka() {
 
 #[test]
 fn test_extract_demokratiewebstatt() {
-    let url = "https://www.demokratiewebstatt.at/thema/thema-umwelt-und-klima/woher-kommt-die-dicke-luft";
+    let url =
+        "https://www.demokratiewebstatt.at/thema/thema-umwelt-und-klima/woher-kommt-die-dicke-luft";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Millionen Menschen fahren jeden Tag"));
     assert!(!res_contains(&result, "Clipdealer"));
@@ -150,7 +176,10 @@ fn test_extract_simplyscience_erdoel() {
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Erdöl bildet nach Millionen"));
     assert!(res_contains(&result, "Warum wird das Erdöl knapp?"));
-    assert!(!res_contains(&result, "Die Natur ist aus chemischen Elementen aufgebaut"));
+    assert!(!res_contains(
+        &result,
+        "Die Natur ist aus chemischen Elementen aufgebaut"
+    ));
 }
 
 #[test]
@@ -168,7 +197,10 @@ fn test_extract_buchperlen() {
     let url = "https://buchperlen.wordpress.com/2013/10/20/leandra-lou-der-etwas-andere-modeblog-jetzt-auch-zwischen-buchdeckeln/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Dann sollten Sie erst recht"));
-    assert!(res_contains(&result, "als saure Gürkchen entlarvte Ex-Boyfriends."));
+    assert!(res_contains(
+        &result,
+        "als saure Gürkchen entlarvte Ex-Boyfriends."
+    ));
     assert!(!res_contains(&result, "Ähnliche Beiträge"));
 }
 
@@ -176,19 +208,34 @@ fn test_extract_buchperlen() {
 fn test_extract_toralin() {
     let url = "http://www.toralin.de/schmierfett-reparierend-verschlei-y-910.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "künftig das XADO-Schutzfett verwenden."));
+    assert!(res_contains(
+        &result,
+        "künftig das XADO-Schutzfett verwenden."
+    ));
     assert!(res_contains(&result, "bis zu 50% Verschleiß."));
-    assert!(res_contains(&result, "Die Lebensdauer von Bauteilen erhöht sich beträchtlich."));
+    assert!(res_contains(
+        &result,
+        "Die Lebensdauer von Bauteilen erhöht sich beträchtlich."
+    ));
     assert!(!res_contains(&result, "Newsletter"));
-    assert!(!res_contains(&result, "Sie könnten auch an folgenden Artikeln interessiert sein"));
+    assert!(!res_contains(
+        &result,
+        "Sie könnten auch an folgenden Artikeln interessiert sein"
+    ));
 }
 
 #[test]
 fn test_extract_fairkom() {
     let url = "https://www.fairkom.eu/about";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "ein gemeinwohlorientiertes Partnerschaftsnetzwerk"));
-    assert!(res_contains(&result, "Stimmberechtigung bei der Generalversammlung."));
+    assert!(res_contains(
+        &result,
+        "ein gemeinwohlorientiertes Partnerschaftsnetzwerk"
+    ));
+    assert!(res_contains(
+        &result,
+        "Stimmberechtigung bei der Generalversammlung."
+    ));
     assert!(!res_contains(&result, "support@fairkom.eu"));
 }
 
@@ -196,10 +243,16 @@ fn test_extract_fairkom() {
 fn test_extract_futurezone_lyft() {
     let url = "https://futurezone.at/digital-life/uber-konkurrent-lyft-startet-mit-waymo-robotertaxis-in-usa/400487461";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Einige Kunden des Fahrdienst-Vermittler Lyft"));
+    assert!(res_contains(
+        &result,
+        "Einige Kunden des Fahrdienst-Vermittler Lyft"
+    ));
     assert!(res_contains(&result, "zeitweise rund vier Prozent."));
     assert!(!res_contains(&result, "Allgemeine Nutzungsbedingungen"));
-    assert!(!res_contains(&result, "Waymo bittet Autohersteller um Geld"));
+    assert!(!res_contains(
+        &result,
+        "Waymo bittet Autohersteller um Geld"
+    ));
 }
 
 #[test]
@@ -207,7 +260,10 @@ fn test_extract_hundeverein() {
     let url = "http://www.hundeverein-kreisunna.de/unserverein.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Beate und Norbert Olschewski"));
-    assert!(res_contains(&result, "ein Familienmitglied und unser Freund."));
+    assert!(res_contains(
+        &result,
+        "ein Familienmitglied und unser Freund."
+    ));
     assert!(!res_contains(&result, "zurück zur Startseite"));
 }
 
@@ -215,7 +271,10 @@ fn test_extract_hundeverein() {
 fn test_extract_viehbacher() {
     let url = "https://viehbacher.com/de/steuerrecht";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "und wirtschaftlich orientierte Privatpersonen"));
+    assert!(res_contains(
+        &result,
+        "und wirtschaftlich orientierte Privatpersonen"
+    ));
     assert!(res_contains(&result, "rund um die Uhr."));
     assert!(res_contains(&result, "Mensch im Mittelpunkt."));
     assert!(!res_contains(&result, "Was sind Cookies?"));
@@ -248,10 +307,16 @@ fn test_extract_kulinariaathome() {
     assert!(res_contains(&result, "zu einem glatten Teig verarbeiten."));
     assert!(res_contains(&result, "goldbraun sind."));
     assert!(res_contains(&result, "200 g Zucker"));
-    assert!(res_contains(&result, "Ein Backblech mit Backpapier auslegen."));
+    assert!(res_contains(
+        &result,
+        "Ein Backblech mit Backpapier auslegen."
+    ));
     assert!(!res_contains(&result, "Sei der Erste"));
     assert!(!res_contains(&result, "Gefällt mir"));
-    assert!(!res_contains(&result, "Trotz sorgfältiger inhaltlicher Kontrolle"));
+    assert!(!res_contains(
+        &result,
+        "Trotz sorgfältiger inhaltlicher Kontrolle"
+    ));
 }
 
 #[test]
@@ -270,11 +335,15 @@ fn test_extract_schleifen_ucoz() {
 
 #[test]
 fn test_extract_austria_radfahren() {
-    let url = "https://www.austria.info/de/aktivitaten/radfahren/radfahren-in-der-weltstadt-salzburg";
+    let url =
+        "https://www.austria.info/de/aktivitaten/radfahren/radfahren-in-der-weltstadt-salzburg";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Salzburg liebt seine Radfahrer."));
     assert!(res_contains(&result, "Puls einsaugen zu lassen."));
-    assert!(!res_contains(&result, "Das könnte Sie auch interessieren ..."));
+    assert!(!res_contains(
+        &result,
+        "Das könnte Sie auch interessieren ..."
+    ));
     assert!(!res_contains(&result, "So macht Radfahren sonst noch Spaß"));
 }
 
@@ -282,17 +351,26 @@ fn test_extract_austria_radfahren() {
 fn test_extract_modepilot_duschkopf() {
     let url = "https://www.modepilot.de/2019/05/21/geht-euch-auch-so-oder-auf-reisen-nie-ohne-meinen-duschkopf/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Allerdings sieht es wie ein Dildo aus,"));
+    assert!(res_contains(
+        &result,
+        "Allerdings sieht es wie ein Dildo aus,"
+    ));
     assert!(res_contains(&result, "gibt Bescheid, ne?"));
     assert!(!res_contains(&result, "Ähnliche Beiträge"));
-    assert!(!res_contains(&result, "Deine E-Mail (bleibt natürlich unter uns)"));
+    assert!(!res_contains(
+        &result,
+        "Deine E-Mail (bleibt natürlich unter uns)"
+    ));
 }
 
 #[test]
 fn test_extract_otto_strohtasche() {
     let url = "https://www.otto.de/twoforfashion/strohtasche/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Ob rund oder kastenförmig, ob dezent oder auffällig"));
+    assert!(res_contains(
+        &result,
+        "Ob rund oder kastenförmig, ob dezent oder auffällig"
+    ));
     assert!(res_contains(&result, "XX, Die Redaktion"));
     assert!(!res_contains(&result, " Kommentieren"));
     assert!(!res_contains(&result, "Dienstag, 4. Juni 2019"));
@@ -302,9 +380,18 @@ fn test_extract_otto_strohtasche() {
 fn test_extract_iloveponysmag_barbour() {
     let url = "http://iloveponysmag.com/2018/05/24/barbour-coastal/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Eine meiner besten Entscheidungen bisher:"));
-    assert!(res_contains(&result, "Verlassenes Gewächshaus meets versteckter Deich"));
-    assert!(res_contains(&result, "Der Hundestrand in Stein an der Ostsee"));
+    assert!(res_contains(
+        &result,
+        "Eine meiner besten Entscheidungen bisher:"
+    ));
+    assert!(res_contains(
+        &result,
+        "Verlassenes Gewächshaus meets versteckter Deich"
+    ));
+    assert!(res_contains(
+        &result,
+        "Der Hundestrand in Stein an der Ostsee"
+    ));
     assert!(!res_contains(&result, "Tags: Barbour,"));
     assert!(res_contains(&result, "Bitte (noch) mehr Bilder von Helle"));
     assert!(!res_contains(&result, "Hinterlasse einen Kommentar"));
@@ -314,13 +401,28 @@ fn test_extract_iloveponysmag_barbour() {
 fn test_extract_moritz_meyer_vreni() {
     let url = "https://moritz-meyer.net/blog/vreni-frost-instagram-abmahnung/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Das ist alles nicht gekennzeichnet, wie soll ich wissen"));
-    assert!(res_contains(&result, "Instagramshops machen es Abmahnanwälten leicht"));
+    assert!(res_contains(
+        &result,
+        "Das ist alles nicht gekennzeichnet, wie soll ich wissen"
+    ));
+    assert!(res_contains(
+        &result,
+        "Instagramshops machen es Abmahnanwälten leicht"
+    ));
     assert!(!res_contains(&result, "Diese Geschichte teilen"));
     assert!(!res_contains(&result, "Ähnliche Beiträge "));
-    assert!(res_contains(&result, "Ich bin der Ansicht, abwarten und Tee trinken."));
-    assert!(res_contains(&result, "Danke für dein Feedback. Auch zum Look meiner Seite."));
-    assert!(!res_contains(&result, "Diese Website verwendet Akismet, um Spam zu reduzieren."));
+    assert!(res_contains(
+        &result,
+        "Ich bin der Ansicht, abwarten und Tee trinken."
+    ));
+    assert!(res_contains(
+        &result,
+        "Danke für dein Feedback. Auch zum Look meiner Seite."
+    ));
+    assert!(!res_contains(
+        &result,
+        "Diese Website verwendet Akismet, um Spam zu reduzieren."
+    ));
 }
 
 #[test]
@@ -338,24 +440,42 @@ fn test_extract_womencantalksports() {
 fn test_extract_plentylife_pamela() {
     let url = "https://plentylife.blogspot.com/2017/05/strong-beautiful-pamela-reif-rezension.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Schönheit kommt für Pamela von Innen und Außen"));
-    assert!(res_contains(&result, "Die Workout Übungen kannte ich bereits"));
+    assert!(res_contains(
+        &result,
+        "Schönheit kommt für Pamela von Innen und Außen"
+    ));
+    assert!(res_contains(
+        &result,
+        "Die Workout Übungen kannte ich bereits"
+    ));
     assert!(res_contains(&result, "Great post, I like your blog"));
     assert!(!res_contains(&result, "Links zu diesem Post"));
     assert!(!res_contains(&result, "mehr über mich ♥"));
-    assert!(!res_contains(&result, "Bitte beachte auch die Datenschutzerklärung von Google."));
+    assert!(!res_contains(
+        &result,
+        "Bitte beachte auch die Datenschutzerklärung von Google."
+    ));
 }
 
 #[test]
 fn test_extract_luxuryhaven_hyatt() {
     let url = "https://www.luxuryhaven.co/2019/05/nam-nghi-phu-quoc-unbound-collection-by-hyatt-officially-opens.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Grounded in sustainable architecture and refined Vietnamese craftsmanship,"));
+    assert!(res_contains(
+        &result,
+        "Grounded in sustainable architecture and refined Vietnamese craftsmanship,"
+    ));
     assert!(res_contains(&result, "and Carmelo Resort"));
-    assert!(res_contains(&result, "OMG what a beautiful place to stay! "));
+    assert!(res_contains(
+        &result,
+        "OMG what a beautiful place to stay! "
+    ));
     assert!(!res_contains(&result, "Food Advertising by"));
     assert!(res_contains(&result, "Dining and Drinking"));
-    assert!(!res_contains(&result, "A lovely note makes a beautiful day!"));
+    assert!(!res_contains(
+        &result,
+        "A lovely note makes a beautiful day!"
+    ));
 }
 
 #[test]
@@ -363,7 +483,10 @@ fn test_extract_luxuriousmagazine_polo() {
     let url = "https://www.luxuriousmagazine.com/2019/06/royal-salute-polo-rome/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Argentina, the birthplace of polo."));
-    assert!(res_contains(&result, "Simon Wittenberg travels to the Eternal City in Italy"));
+    assert!(res_contains(
+        &result,
+        "Simon Wittenberg travels to the Eternal City in Italy"
+    ));
     assert!(!res_contains(&result, "Luxury and lifestyle articles"));
     assert!(!res_contains(&result, "Pinterest"));
 }
@@ -392,10 +515,19 @@ fn test_extract_rechtambild() {
 fn test_extract_internet_law() {
     let url = "http://www.internet-law.de/2011/07/verstost-der-ausschluss-von-pseudonymen-bei-google-gegen-deutsches-recht.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Wann Blogs einer Impressumspflicht unterliegen,"));
+    assert!(res_contains(
+        &result,
+        "Wann Blogs einer Impressumspflicht unterliegen,"
+    ));
     assert!(!res_contains(&result, "Über mich"));
-    assert!(!res_contains(&result, "Gesetzes- und Rechtsprechungszitate werden automatisch"));
-    assert!(res_contains(&result, "Mit Verlaub, ich halte das für groben Unsinn."));
+    assert!(!res_contains(
+        &result,
+        "Gesetzes- und Rechtsprechungszitate werden automatisch"
+    ));
+    assert!(res_contains(
+        &result,
+        "Mit Verlaub, ich halte das für groben Unsinn."
+    ));
 }
 
 #[test]
@@ -414,8 +546,14 @@ fn test_extract_telemedicus() {
 fn test_extract_cnet_de() {
     let url = "https://www.cnet.de/88130484/so-koennen-internet-user-nach-dem-eugh-urteil-fuer-den-schutz-sensibler-daten-sorgen";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Auch der Verweis auf ehrverletzende Bewertungen"));
-    assert!(!res_contains(&result, "Fanden Sie diesen Artikel nützlich?"));
+    assert!(res_contains(
+        &result,
+        "Auch der Verweis auf ehrverletzende Bewertungen"
+    ));
+    assert!(!res_contains(
+        &result,
+        "Fanden Sie diesen Artikel nützlich?"
+    ));
     assert!(!res_contains(&result, "Kommentar hinzufügen"));
     assert!(!res_contains(&result, "Anja Schmoll-Trautmann"));
     assert!(!res_contains(&result, "Aktuell"));
@@ -426,9 +564,18 @@ fn test_extract_correctiv() {
     let url = "https://correctiv.org/aktuelles/neue-rechte/2019/05/14/wir-haben-bereits-die-zusage";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(!res_contains(&result, "Alle Artikel zu unseren Recherchen"));
-    assert!(res_contains(&result, "Vorweg: Die beteiligten AfD-Politiker"));
-    assert!(res_contains(&result, "ist heute Abend um 21 Uhr auch im ZDF-Magazin Frontal"));
-    assert!(!res_contains(&result, "Wir informieren Sie regelmäßig zum Thema Neue Rechte"));
+    assert!(res_contains(
+        &result,
+        "Vorweg: Die beteiligten AfD-Politiker"
+    ));
+    assert!(res_contains(
+        &result,
+        "ist heute Abend um 21 Uhr auch im ZDF-Magazin Frontal"
+    ));
+    assert!(!res_contains(
+        &result,
+        "Wir informieren Sie regelmäßig zum Thema Neue Rechte"
+    ));
     assert!(!res_contains(&result, "Kommentar verfassen"));
     assert!(!res_contains(&result, "weiterlesen"));
 }
@@ -438,11 +585,20 @@ fn test_extract_sueddeutsche_flixtrain() {
     let url = "https://www.sueddeutsche.de/wirtschaft/bahn-flixbus-flixtrain-deutschlandtakt-fernverkehr-1.4445845";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(!res_contains(&result, "05:28 Uhr"));
-    assert!(res_contains(&result, "Bahn-Konkurrenten wie Flixbus fürchten durch den geplanten Deutschlandtakt"));
+    assert!(res_contains(
+        &result,
+        "Bahn-Konkurrenten wie Flixbus fürchten durch den geplanten Deutschlandtakt"
+    ));
     assert!(!res_contains(&result, "ICE im S-Bahn-Takt"));
     assert!(!res_contains(&result, "Diskussion zu diesem Artikel auf:"));
-    assert!(!res_contains(&result, "Berater-Affäre bringt Bahnchef Lutz in Bedrängnis"));
-    assert!(res_contains(&result, "auch der Bus ein klimafreundliches Verkehrsmittel sei"));
+    assert!(!res_contains(
+        &result,
+        "Berater-Affäre bringt Bahnchef Lutz in Bedrängnis"
+    ));
+    assert!(res_contains(
+        &result,
+        "auch der Bus ein klimafreundliches Verkehrsmittel sei"
+    ));
 }
 
 #[test]
@@ -450,10 +606,16 @@ fn test_extract_adac_kindersitze() {
     let url = "https://www.adac.de/rund-ums-fahrzeug/tests/kindersicherheit/kindersitztest-2018/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(!res_contains(&result, "Rund ums Fahrzeug"));
-    assert!(res_contains(&result, "in punkto Sicherheit, Bedienung, Ergonomie"));
+    assert!(res_contains(
+        &result,
+        "in punkto Sicherheit, Bedienung, Ergonomie"
+    ));
     assert!(res_contains(&result, "Grenzwert der Richtlinie 2014/79/EU"));
     assert!(!res_contains(&result, "Diesel-Umtauschprämien"));
-    assert!(res_contains(&result, "Besonders bei Babyschalen sollte geprüft werden"));
+    assert!(res_contains(
+        &result,
+        "Besonders bei Babyschalen sollte geprüft werden"
+    ));
 }
 
 #[test]
@@ -461,7 +623,10 @@ fn test_extract_caktusgroup_django() {
     let url = "https://www.caktusgroup.com/blog/2015/06/08/testing-client-side-applications-django-post-mortem/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Was I losing my mind?"));
-    assert!(res_contains(&result, "being cached after their first access."));
+    assert!(res_contains(
+        &result,
+        "being cached after their first access."
+    ));
     assert!(res_contains(&result, "Finding a Fix"));
     assert!(res_contains(&result, "from django.conf import settings"));
     assert!(!res_contains(&result, "New Call-to-action"));
@@ -475,9 +640,15 @@ fn test_extract_computerbase_htc() {
     let url = "https://www.computerbase.de/2007-06/htc-touch-bald-bei-o2-als-xda-nova/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Vor knapp zwei Wochen"));
-    assert!(res_contains(&result, "gibt es in der dazugehörigen Vorstellungs-News."));
+    assert!(res_contains(
+        &result,
+        "gibt es in der dazugehörigen Vorstellungs-News."
+    ));
     assert!(!res_contains(&result, "Themen:"));
-    assert!(!res_contains(&result, "bis Januar 2009 Artikel für ComputerBase verfasst."));
+    assert!(!res_contains(
+        &result,
+        "bis Januar 2009 Artikel für ComputerBase verfasst."
+    ));
     assert!(!res_contains(&result, "Warum Werbebanner?"));
     assert!(!res_contains(&result, "71 Kommentare"));
 }
@@ -497,11 +668,23 @@ fn test_extract_basicthinking_tweets() {
     let url = "https://www.basicthinking.de/blog/2018/12/05/erfolgreiche-tweets-zutaten/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Frank Thelen, Investor"));
-    assert!(res_contains(&result, "Female founders must constantly consider"));
+    assert!(res_contains(
+        &result,
+        "Female founders must constantly consider"
+    ));
     assert!(res_contains(&result, "Thema des öffentlichen Interesses"));
-    assert!(!res_contains(&result, "Nach langjähriger Tätigkeit im Ausland"));
-    assert!(res_contains(&result, "Schaut man ganz genau hin, ist der Habeck-Kommentar"));
-    assert!(!res_contains(&result, "Mit Absendung des Formulars willige ich"));
+    assert!(!res_contains(
+        &result,
+        "Nach langjähriger Tätigkeit im Ausland"
+    ));
+    assert!(res_contains(
+        &result,
+        "Schaut man ganz genau hin, ist der Habeck-Kommentar"
+    ));
+    assert!(!res_contains(
+        &result,
+        "Mit Absendung des Formulars willige ich"
+    ));
     assert!(!res_contains(&result, "Kommentieren"));
 }
 
@@ -509,14 +692,29 @@ fn test_extract_basicthinking_tweets() {
 fn test_extract_meedia_freenet() {
     let url = "https://meedia.de/2016/03/08/einstieg-ins-tv-geschaeft-wie-freenet-privatkunden-fuer-antennen-tv-in-hd-qualitaet-gewinnen-will/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Welche Werbeeinnahmen erwarten Sie hier langfristig?"));
-    assert!(res_contains(&result, "wir haben keinerlei Pläne, das zu verändern."));
+    assert!(res_contains(
+        &result,
+        "Welche Werbeeinnahmen erwarten Sie hier langfristig?"
+    ));
+    assert!(res_contains(
+        &result,
+        "wir haben keinerlei Pläne, das zu verändern."
+    ));
     assert!(!res_contains(&result, "Nachrichtenüberblick abonnieren"));
-    assert!(!res_contains(&result, "über alle aktuellen Entwicklungen auf dem Laufenden."));
+    assert!(!res_contains(
+        &result,
+        "über alle aktuellen Entwicklungen auf dem Laufenden."
+    ));
     assert!(!res_contains(&result, "Schlagworte"));
     assert!(!res_contains(&result, "Teilen"));
-    assert!(!res_contains(&result, "Dauerzoff um drohenden UKW-Blackout"));
-    assert!(res_contains(&result, "Mobilcom Debitel has charged me for third party"));
+    assert!(!res_contains(
+        &result,
+        "Dauerzoff um drohenden UKW-Blackout"
+    ));
+    assert!(res_contains(
+        &result,
+        "Mobilcom Debitel has charged me for third party"
+    ));
 }
 
 #[test]
@@ -525,8 +723,14 @@ fn test_extract_incurvy_wellness() {
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Zeit für Loslassen und Entspannung."));
     assert!(res_contains(&result, "Wie sieht dein Alltag aus?"));
-    assert!(res_contains(&result, "Erfrischende, abschwellende Augencreme Phyto Contour"));
-    assert!(res_contains(&result, "Vielen Dank Anja für deine Tipps rund um Beauty"));
+    assert!(res_contains(
+        &result,
+        "Erfrischende, abschwellende Augencreme Phyto Contour"
+    ));
+    assert!(res_contains(
+        &result,
+        "Vielen Dank Anja für deine Tipps rund um Beauty"
+    ));
     assert!(!res_contains(&result, "Betreiberin von incurvy Plus Size"));
     assert!(!res_contains(&result, "Wir verwenden Cookies"));
 }
@@ -535,7 +739,10 @@ fn test_extract_incurvy_wellness() {
 fn test_extract_dw_frühburgunder() {
     let url = "https://www.dw.com/en/uncork-the-mystery-of-germanys-fr%C3%BChburgunder/a-16863843";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "No grape variety invites as much intrigue"));
+    assert!(res_contains(
+        &result,
+        "No grape variety invites as much intrigue"
+    ));
     assert!(res_contains(&result, "With just 0.9 hectares"));
     assert!(!res_contains(&result, "Related Subjects"));
     assert!(!res_contains(&result, "Audios and videos on the topic"));
@@ -545,7 +752,10 @@ fn test_extract_dw_frühburgunder() {
 fn test_extract_jolie_adele() {
     let url = "https://www.jolie.de/stars/adele-10-kilo-abgenommen-sie-zeigt-sich-schlanker-denn-je-200226.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Adele feierte ausgelassen mit den Spice Girls"));
+    assert!(res_contains(
+        &result,
+        "Adele feierte ausgelassen mit den Spice Girls"
+    ));
     assert!(res_contains(&result, "wie sich Adele weiterentwickelt."));
     assert!(!res_contains(&result, "Sommerzeit ist Urlaubszeit,"));
     assert!(!res_contains(&result, "Lade weitere Inhalte"));
@@ -584,19 +794,28 @@ fn test_extract_franziska_elea_vuitton() {
     assert!(!res_contains(&result, "Palm Springs Mini (links)"));
     assert!(!res_contains(&result, "Diese Website verwendet Akismet"));
     assert!(!res_contains(&result, "New York, New York"));
-    assert!(html_contains(&result, "Flauschjacke: <strong>Bershka</strong>"));
+    assert!(html_contains(
+        &result,
+        "Flauschjacke: <strong>Bershka</strong>"
+    ));
 }
 
 #[test]
 fn test_extract_gofeminin_abnehmen() {
     let url = "https://www.gofeminin.de/abnehmen/wie-kann-ich-schnell-abnehmen-s1431651.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Die Psyche spielt eine nicht unerhebliche Rolle"));
+    assert!(res_contains(
+        &result,
+        "Die Psyche spielt eine nicht unerhebliche Rolle"
+    ));
     assert!(!res_contains(&result, "Sportskanone oder Sportmuffel"));
     assert!(!res_contains(&result, "PINNEN"));
     assert!(res_contains(&result, "2. Satt essen bei den Mahlzeiten"));
     assert!(!res_contains(&result, "Bringt die Kilos zum Purzeln!"));
-    assert!(!res_contains(&result, "Crash-Diäten ziehen meist den Jojo-Effekt"));
+    assert!(!res_contains(
+        &result,
+        "Crash-Diäten ziehen meist den Jojo-Effekt"
+    ));
 }
 
 #[test]
@@ -609,17 +828,32 @@ fn test_extract_brigitte_ikigai() {
     assert!(res_contains(&result, "14,90 Euro."));
     assert!(!res_contains(&result, "Neu in Liebe"));
     assert!(!res_contains(&result, "Erfahre mehr"));
-    assert!(!res_contains(&result, "Erfahrung mit privater Arbeitsvermittlung?"));
+    assert!(!res_contains(
+        &result,
+        "Erfahrung mit privater Arbeitsvermittlung?"
+    ));
 }
 
 #[test]
 fn test_extract_changelog_blog_sportscheck() {
     let url = "https://www.changelog.blog/zwischenbilanz-jan-kegelberg-ueber-tops-und-flops-bei-der-transformation-von-sportscheck/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Gibt es weitere Top-Maßnahmen für Multi-Channel?"));
-    assert!(res_contains(&result, "Vielen Dank für das interessante Interview!"));
-    assert!(!res_contains(&result, "akzeptiere die Datenschutzbestimmungen"));
-    assert!(!res_contains(&result, "Diese Beiträge solltest du nicht verpassen"));
+    assert!(res_contains(
+        &result,
+        "Gibt es weitere Top-Maßnahmen für Multi-Channel?"
+    ));
+    assert!(res_contains(
+        &result,
+        "Vielen Dank für das interessante Interview!"
+    ));
+    assert!(!res_contains(
+        &result,
+        "akzeptiere die Datenschutzbestimmungen"
+    ));
+    assert!(!res_contains(
+        &result,
+        "Diese Beiträge solltest du nicht verpassen"
+    ));
     assert!(!res_contains(&result, "Annette Henkel"));
 }
 
@@ -627,11 +861,20 @@ fn test_extract_changelog_blog_sportscheck() {
 fn test_extract_threatpost_android() {
     let url = "https://threatpost.com/android-ransomware-spreads-via-sex-simulation-game-links-on-reddit-sms/146774/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "These messages include links to the ransomware"));
-    assert!(res_contains(&result, "using novel techniques to exfiltrate data."));
+    assert!(res_contains(
+        &result,
+        "These messages include links to the ransomware"
+    ));
+    assert!(res_contains(
+        &result,
+        "using novel techniques to exfiltrate data."
+    ));
     assert!(!res_contains(&result, "Share this article:"));
     assert!(!res_contains(&result, "Write a comment"));
-    assert!(!res_contains(&result, "Notify me when new comments are added."));
+    assert!(!res_contains(
+        &result,
+        "Notify me when new comments are added."
+    ));
     assert!(!res_contains(&result, "uses Akismet to reduce spam."));
 }
 
@@ -640,7 +883,10 @@ fn test_extract_vice_amazon() {
     let url = "https://www.vice.com/en_uk/article/d3avvm/the-amazon-is-on-fire-and-the-smoke-can-be-seen-from-space";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Brazil went dark."));
-    assert!(res_contains(&result, "the highest number of deforestation warnings.\u{201d}"));
+    assert!(res_contains(
+        &result,
+        "the highest number of deforestation warnings.\u{201d}"
+    ));
     assert!(!res_contains(&result, "Tagged:"));
     assert!(!res_contains(&result, "to the VICE newsletter."));
     assert!(!res_contains(&result, "Watch this next"));
@@ -663,33 +909,61 @@ fn test_extract_theverge_ios13() {
     assert!(res_contains(&result, "across both the eyes and nose."));
     assert!(res_contains(&result, "Added ARKit explanation and tweet."));
     assert!(!res_contains(&result, "Singapore's public health program"));
-    assert!(!res_contains(&result, "Command Line delivers daily updates"));
+    assert!(!res_contains(
+        &result,
+        "Command Line delivers daily updates"
+    ));
 }
 
 #[test]
 fn test_extract_crazy_julia_braut() {
     let url = "https://crazy-julia.de/beauty-tipps-die-jede-braut-kennen-sollte/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "in keinem Braut-Beauty-Programm fehlen darf?"));
-    assert!(res_contains(&result, "nicht nur vor der Hochzeit ein absolutes Muss."));
+    assert!(res_contains(
+        &result,
+        "in keinem Braut-Beauty-Programm fehlen darf?"
+    ));
+    assert!(res_contains(
+        &result,
+        "nicht nur vor der Hochzeit ein absolutes Muss."
+    ));
     assert!(res_contains(&result, "Gesundes, glänzendes Haar"));
     assert!(!res_contains(&result, "Neue Wandbilder von Posterlounge"));
-    assert!(!res_contains(&result, "mit meinen Texten und mit meinen Gedanken."));
-    assert!(!res_contains(&result, "Erforderliche Felder sind mit * markiert."));
+    assert!(!res_contains(
+        &result,
+        "mit meinen Texten und mit meinen Gedanken."
+    ));
+    assert!(!res_contains(
+        &result,
+        "Erforderliche Felder sind mit * markiert."
+    ));
 }
 
 #[test]
 fn test_extract_brandenburg_homo() {
-    let url = "https://www.politische-bildung-brandenburg.de/themen/land-und-leute/homo-brandenburgensis";
+    let url =
+        "https://www.politische-bildung-brandenburg.de/themen/land-und-leute/homo-brandenburgensis";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Stilles Rackern, statt lautem Deklamieren."));
-    assert!(res_contains(&result, "Watt jibt\u{2019}s n hier zu lachen?"));
-    assert!(res_contains(&result, "Das Brandenbuch. Ein Land in Stichworten."));
+    assert!(res_contains(
+        &result,
+        "Stilles Rackern, statt lautem Deklamieren."
+    ));
+    assert!(res_contains(
+        &result,
+        "Watt jibt\u{2019}s n hier zu lachen?"
+    ));
+    assert!(res_contains(
+        &result,
+        "Das Brandenbuch. Ein Land in Stichworten."
+    ));
     assert!(!res_contains(&result, "Bürgerbeteiligung"));
     assert!(!res_contains(&result, "Anmelden"));
     assert!(!res_contains(&result, "Foto: Timur"));
     assert!(!res_contains(&result, "Schlagworte"));
-    assert!(!res_contains(&result, "Zeilenumbrüche und Absätze werden automatisch erzeugt."));
+    assert!(!res_contains(
+        &result,
+        "Zeilenumbrüche und Absätze werden automatisch erzeugt."
+    ));
 }
 
 #[test]
@@ -698,7 +972,10 @@ fn test_extract_skateboardmsm_dormhagen() {
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Wakebeach 257"));
     assert!(res_contains(&result, "Be there or be square!"));
-    assert!(res_contains(&result, "Hier geht\u{2019}s zur Facebook Veranstaltung"));
+    assert!(res_contains(
+        &result,
+        "Hier geht\u{2019}s zur Facebook Veranstaltung"
+    ));
     assert!(!res_contains(&result, "More from News"));
     assert!(!res_contains(&result, "von Redaktion MSM"));
     assert!(!res_contains(&result, "add yours."));
@@ -708,20 +985,35 @@ fn test_extract_skateboardmsm_dormhagen() {
 fn test_extract_knowtechie_rocket_league() {
     let url = "https://knowtechie.com/rocket-pass-4-in-rocket-league-brings-with-it-a-new-rally-inspired-car/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Rocket Pass 4 will begin at 10:00 a.m. PDT"));
+    assert!(res_contains(
+        &result,
+        "Rocket Pass 4 will begin at 10:00 a.m. PDT"
+    ));
     assert!(res_contains(&result, "Holy shit, Mortal Kombat 11"));
-    assert!(res_contains(&result, "Let us know down below in the comments"));
+    assert!(res_contains(
+        &result,
+        "Let us know down below in the comments"
+    ));
     assert!(!res_contains(&result, "Related Topics"));
     assert!(!res_contains(&result, "You can keep up with me on Twitter"));
-    assert!(!res_contains(&result, "Hit the track today with Mario Kart Tour"));
+    assert!(!res_contains(
+        &result,
+        "Hit the track today with Mario Kart Tour"
+    ));
 }
 
 #[test]
 fn test_extract_wikipedia_tsne() {
     let url = "https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Given a set of high-dimensional objects"));
-    assert!(res_contains(&result, "Herein a heavy-tailed Student t-distribution"));
+    assert!(res_contains(
+        &result,
+        "Given a set of high-dimensional objects"
+    ));
+    assert!(res_contains(
+        &result,
+        "Herein a heavy-tailed Student t-distribution"
+    ));
     assert!(!res_contains(&result, "Categories:"));
     assert!(!res_contains(&result, "Conditional random field"));
 }
@@ -730,7 +1022,10 @@ fn test_extract_wikipedia_tsne() {
 fn test_extract_mixed_de_vrodo() {
     let url = "https://mixed.de/vrodo-deals-vr-taugliches-notebook-fuer-83215-euro-99-cent-leihfilme-bei-amazon-psvr/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Niedlicher Roboter-Spielkamerad: Anki Cozmo"));
+    assert!(res_contains(
+        &result,
+        "Niedlicher Roboter-Spielkamerad: Anki Cozmo"
+    ));
     assert!(res_contains(&result, "Empfehlungen von Dennis:"));
     assert!(!res_contains(&result, "Unterstütze unsere Arbeit"));
     assert!(!res_contains(&result, "Deepfake-Hollywood"));
@@ -740,7 +1035,8 @@ fn test_extract_mixed_de_vrodo() {
 
 #[test]
 fn test_extract_spreeblick_habeck() {
-    let url = "http://www.spreeblick.com/blog/2006/07/29/aus-aus-alles-vorbei-habeck-macht-die-stahnke/";
+    let url =
+        "http://www.spreeblick.com/blog/2006/07/29/aus-aus-alles-vorbei-habeck-macht-die-stahnke/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Hunderttausende von jungen Paaren"));
     assert!(res_contains(&result, "wie flatterhaft das Mädl ist? :)"));
@@ -763,14 +1059,35 @@ fn test_extract_majkaswelt_fashion() {
 fn test_extract_erp_news_interview() {
     let url = "https://erp-news.info/erp-interview-mit-um-digitale-assistenten-und-kuenstliche-intelligenz-ki/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Einblicke in die Vision zukünftiger Softwaregenerationen"));
-    assert!(res_contains(&result, "Frage 4: Welche Rolle spielt Big Data in Bezug auf Assistenz-Systeme und KI?"));
-    assert!(res_contains(&result, "von The unbelievable Machine Company (*um) zur Verfügung gestellt."));
-    assert!(!res_contains(&result, "Matthias Weber ist ERP-Experte mit langjähriger Berufserfahrung."));
-    assert!(!res_contains(&result, "Die Top 5 digitalen Trends für den Mittelstand"));
+    assert!(res_contains(
+        &result,
+        "Einblicke in die Vision zukünftiger Softwaregenerationen"
+    ));
+    assert!(res_contains(
+        &result,
+        "Frage 4: Welche Rolle spielt Big Data in Bezug auf Assistenz-Systeme und KI?"
+    ));
+    assert!(res_contains(
+        &result,
+        "von The unbelievable Machine Company (*um) zur Verfügung gestellt."
+    ));
+    assert!(!res_contains(
+        &result,
+        "Matthias Weber ist ERP-Experte mit langjähriger Berufserfahrung."
+    ));
+    assert!(!res_contains(
+        &result,
+        "Die Top 5 digitalen Trends für den Mittelstand"
+    ));
     assert!(!res_contains(&result, ", leading edge,"));
-    assert!(html_contains(&result, "<strong>Vision zukünftiger Softwaregenerationen</strong>."));
-    assert!(html_contains(&result, "von <b>The unbelievable Machine Company (*um)</b> zur Verfügung gestellt."));
+    assert!(html_contains(
+        &result,
+        "<strong>Vision zukünftiger Softwaregenerationen</strong>."
+    ));
+    assert!(html_contains(
+        &result,
+        "von <b>The unbelievable Machine Company (*um)</b> zur Verfügung gestellt."
+    ));
 }
 
 #[test]
@@ -786,8 +1103,14 @@ fn test_extract_boingboing_millenials() {
 fn test_extract_github_blog_spiceland() {
     let url = "https://github.blog/2019-03-29-leader-spotlight-erin-spiceland/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "Erin Spiceland is a Software Engineer for SpaceX."));
-    assert!(res_contains(&result, "make effective plans and goals for the future"));
+    assert!(res_contains(
+        &result,
+        "Erin Spiceland is a Software Engineer for SpaceX."
+    ));
+    assert!(res_contains(
+        &result,
+        "make effective plans and goals for the future"
+    ));
     assert!(res_contains(&result, "looking forward to next?"));
     assert!(res_contains(&result, "Research Consultant at Adelard LLP"));
     assert!(!res_contains(&result, "Related posts"));
@@ -801,12 +1124,18 @@ fn test_extract_lady50plus_sekre() {
     let url = "https://lady50plus.de/2019/06/19/sekre-mystery-bag/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "ist eine echte Luxushandtasche"));
-    assert!(res_contains(&result, "Insgesamt 160 weibliche \u{201e}Designerinnen\u{201c}"));
+    assert!(res_contains(
+        &result,
+        "Insgesamt 160 weibliche \u{201e}Designerinnen\u{201c}"
+    ));
     assert!(res_contains(&result, "Sei herzlich gegrüßt"));
     assert!(res_contains(&result, "Ein Mann alleine hätte niemals"));
     assert!(!res_contains(&result, "Erforderliche Felder sind mit"));
     assert!(!res_contains(&result, "Benachrichtige mich"));
-    assert!(!res_contains(&result, "Reisen ist meine große Leidenschaft"));
+    assert!(!res_contains(
+        &result,
+        "Reisen ist meine große Leidenschaft"
+    ));
     assert!(!res_contains(&result, "Styling Tipps für Oktober"));
     assert!(res_contains(&result, "in den Bann ziehen!"));
 }
@@ -818,13 +1147,17 @@ fn test_extract_sonntag_sachsen_thomanerchor() {
     assert!(res_contains(&result, "Neuer Geschäftsführender Leiter"));
     assert!(res_contains(&result, "nach Leipzig wechseln."));
     assert!(!res_contains(&result, "Mehr zum Thema"));
-    assert!(!res_contains(&result, "Folgen Sie uns auf Facebook und Twitter"));
+    assert!(!res_contains(
+        &result,
+        "Folgen Sie uns auf Facebook und Twitter"
+    ));
     assert!(!res_contains(&result, "Aktuelle Ausgabe"));
 }
 
 #[test]
 fn test_extract_psl_eu_luniversite() {
-    let url = "https://www.psl.eu/actualites/luniversite-psl-quand-les-grandes-ecoles-font-universite";
+    let url =
+        "https://www.psl.eu/actualites/luniversite-psl-quand-les-grandes-ecoles-font-universite";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Le décret n°2019-1130 validant"));
     assert!(res_contains(&result, "restructurant à cet effet \u{bb}."));
@@ -847,8 +1180,14 @@ fn test_extract_chip_de_beef() {
 fn test_extract_sauvonsluniversite() {
     let url = "http://www.sauvonsluniversite.fr/spip.php?article8532";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "L\u{2019}AG Éducation Île-de-France inter-degrés"));
-    assert!(res_contains(&result, "Grève et mobilisation pour le climat"));
+    assert!(res_contains(
+        &result,
+        "L\u{2019}AG Éducation Île-de-France inter-degrés"
+    ));
+    assert!(res_contains(
+        &result,
+        "Grève et mobilisation pour le climat"
+    ));
     assert!(res_contains(&result, "suivi.reformes.blanquer@gmail.com"));
     assert!(!res_contains(&result, "Sauvons l\u{2019}Université !"));
     assert!(!res_contains(&result, "La semaine de SLU"));
@@ -859,19 +1198,28 @@ fn test_extract_spiegel_albtraum() {
     let url = "https://www.spiegel.de/spiegel/print/d-161500790.html";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Wie konnte es dazu kommen?"));
-    assert!(res_contains(&result, "Die Geschichte beginnt am 26. Oktober"));
+    assert!(res_contains(
+        &result,
+        "Die Geschichte beginnt am 26. Oktober"
+    ));
     assert!(res_contains(&result, "Es stützt seine Version."));
     assert!(!res_contains(&result, "und Vorteile sichern!"));
     assert!(!res_contains(&result, "Verschickt"));
     assert!(!res_contains(&result, "Die digitale Welt der Nachrichten."));
-    assert!(!res_contains(&result, "Vervielfältigung nur mit Genehmigung"));
+    assert!(!res_contains(
+        &result,
+        "Vervielfältigung nur mit Genehmigung"
+    ));
 }
 
 #[test]
 fn test_extract_lemire_json_parsing() {
     let url = "https://lemire.me/blog/2019/08/02/json-parsing-simdjson-vs-json-for-modern-c/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
-    assert!(res_contains(&result, "I use a Skylake processor with GNU GCC 8.3."));
+    assert!(res_contains(
+        &result,
+        "I use a Skylake processor with GNU GCC 8.3."
+    ));
     assert!(res_contains(&result, "gsoc-2018"));
     assert!(res_contains(&result, "0.091 GB/s"));
     assert!(res_contains(&result, "version 0.2 on vcpkg."));
@@ -889,8 +1237,14 @@ fn test_extract_zeit_de_zugverkehr() {
     assert!(res_contains(&result, "Deutschland kaum beschleunigt."));
     assert!(!res_contains(&result, "Durchgehende Tickets fehlen"));
     assert!(res_contains(&result, "geprägte Fehlentscheidung."));
-    assert!(res_contains(&result, "horrende Preise für miserablen Service bezahlen?"));
-    assert!(!res_contains(&result, "Bitte melden Sie sich an, um zu kommentieren."));
+    assert!(res_contains(
+        &result,
+        "horrende Preise für miserablen Service bezahlen?"
+    ));
+    assert!(!res_contains(
+        &result,
+        "Bitte melden Sie sich an, um zu kommentieren."
+    ));
 }
 
 #[test]
@@ -898,7 +1252,10 @@ fn test_extract_franceculture_idees() {
     let url = "https://www.franceculture.fr/emissions/le-journal-des-idees/le-journal-des-idees-emission-du-mardi-14-janvier-2020";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "Performativité"));
-    assert!(res_contains(&result, "Les individus productifs communiquent"));
+    assert!(res_contains(
+        &result,
+        "Les individus productifs communiquent"
+    ));
     assert!(res_contains(&result, "de nos espoirs et de nos désirs."));
     assert!(!res_contains(&result, "A la tribune je monterai"));
     assert!(!res_contains(&result, "À découvrir"));
@@ -910,7 +1267,10 @@ fn test_extract_wikimediafoundation_turkey() {
     let url = "https://wikimediafoundation.org/news/2020/01/15/access-to-wikipedia-restored-in-turkey-after-more-than-two-and-a-half-years/";
     let result = extract_mock_file(url, false).expect("extraction should succeed");
     assert!(res_contains(&result, "as further access is restored."));
-    assert!(!res_contains(&result, "Read further in the pursuit of knowledge"));
+    assert!(!res_contains(
+        &result,
+        "Read further in the pursuit of knowledge"
+    ));
     assert!(!res_contains(&result, "Here's what that means."));
     assert!(!res_contains(&result, "Stay up-to-date on our work."));
     assert!(!res_contains(&result, "Photo credits"));
@@ -944,11 +1304,16 @@ fn test_extract_vancouversun_microsoft() {
 fn test_extract_pcgamer_skyrim_with_links() {
     let url = "http://www.pcgamer.com/2012/08/09/skyrim-part-1/";
     let result = extract_mock_file(url, true).expect("extraction should succeed");
-    assert!(html_contains(&result, r#"In <a href="https://www.pcgamer.com/best-skyrim-mods/">Skyrim</a>, a mage"#));
+    assert!(html_contains(
+        &result,
+        r#"In <a href="https://www.pcgamer.com/best-skyrim-mods/">Skyrim</a>, a mage"#
+    ));
     // Go serializes ' as &#39; but html5ever leaves it unescaped — both are valid HTML.
     assert!(
-        html_contains(&result, "<em>Legends </em>don&#39;t destroy <em>houses</em>,")
-        || html_contains(&result, "<em>Legends </em>don't destroy <em>houses</em>,")
+        html_contains(
+            &result,
+            "<em>Legends </em>don&#39;t destroy <em>houses</em>,"
+        ) || html_contains(&result, "<em>Legends </em>don't destroy <em>houses</em>,")
     );
 }
 /// Port of `Test_ExoticTags` from trafilatura_test.go.
@@ -957,7 +1322,8 @@ fn test_extract_pcgamer_skyrim_with_links() {
 #[test]
 fn test_extract_exotic_tags() {
     // Fixture: teletype text and inline content
-    let result = extract_mock_file("http://exotic_tags", false).expect("exotic_tags fixture should extract");
+    let result =
+        extract_mock_file("http://exotic_tags", false).expect("exotic_tags fixture should extract");
     assert!(res_contains(&result, "Teletype text"));
     assert!(res_contains(&result, "My new car is silver."));
 
@@ -1015,7 +1381,9 @@ fn test_extract_exotic_tags() {
         let result = trafilatura::extract(html, opts)
             .unwrap_or_else(|_| panic!("em-wrapping-p should extract (focus={focus:?})"));
         assert!(
-            result.content_text.contains("em improperly wrapping p here"),
+            result
+                .content_text
+                .contains("em improperly wrapping p here"),
             "focus={focus:?}: expected 'em improperly wrapping p here'"
         );
         assert!(

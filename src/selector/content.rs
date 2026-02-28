@@ -223,7 +223,8 @@ mod tests {
 
     #[test]
     fn test_query_all_returns_multiple() {
-        let doc = parse(r#"<html><body><article>one</article><article>two</article></body></html>"#);
+        let doc =
+            parse(r#"<html><body><article>one</article><article>two</article></body></html>"#);
         let body = doc.body().unwrap();
         assert_eq!(query_all(&doc, body, CONTENT).len(), 2);
     }

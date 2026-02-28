@@ -24,12 +24,16 @@ fn html_doc(body: &str) -> String {
 
 /// Run extraction and return `content_html` on success.
 fn extract_html(html: &str, opts: Options) -> Option<String> {
-    trafilatura::extract(html, opts).ok().map(|r| r.content_html)
+    trafilatura::extract(html, opts)
+        .ok()
+        .map(|r| r.content_html)
 }
 
 /// Run extraction and return `content_text` on success.
 fn extract_text(html: &str, opts: Options) -> Option<String> {
-    trafilatura::extract(html, opts).ok().map(|r| r.content_text)
+    trafilatura::extract(html, opts)
+        .ok()
+        .map(|r| r.content_text)
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +190,10 @@ fn test_formatting_links_stripped_by_default() {
     let html = html_doc(r#"<p><a href="">Link text</a></p>"#);
     let text = extract_text(&html, zero_opts()).unwrap_or_default();
     // The link text should still be present (only the <a> tag is stripped, not the text).
-    assert_eq!(text, "Link text", "link text should be preserved even when links are stripped");
+    assert_eq!(
+        text, "Link text",
+        "link text should be preserved even when links are stripped"
+    );
 }
 
 /// Line break only inside <p> → empty content.
@@ -194,7 +201,10 @@ fn test_formatting_links_stripped_by_default() {
 fn test_formatting_br_only_produces_empty_content() {
     let html = html_doc(r#"<p><br/></p>"#);
     let text = extract_text(&html, zero_opts()).unwrap_or_default();
-    assert_eq!(text, "", "br-only paragraph should produce empty content text");
+    assert_eq!(
+        text, "",
+        "br-only paragraph should produce empty content text"
+    );
 }
 
 /// Leading line break before text: the text itself should be extracted.
@@ -266,7 +276,9 @@ fn test_formatting_list_with_links() {
 /// which is the authoritative HTML output and matches the Go HTML assertion.
 #[test]
 fn test_formatting_within_p_no_links() {
-    let raw_html = html_doc(r#"<p><b>bold</b>, <i>italics</i>, <tt>tt</tt>, <strike>deleted</strike>, <u>underlined</u>, <a href="test.html">link</a> and additional text to bypass detection.</p>"#);
+    let raw_html = html_doc(
+        r#"<p><b>bold</b>, <i>italics</i>, <tt>tt</tt>, <strike>deleted</strike>, <u>underlined</u>, <a href="test.html">link</a> and additional text to bypass detection.</p>"#,
+    );
     let opts = {
         let mut c = Config::default();
         c.min_extracted_size = 0;
@@ -294,7 +306,9 @@ fn test_formatting_within_p_no_links() {
         result.content_text
     );
     assert!(
-        result.content_text.contains("additional text to bypass detection"),
+        result
+            .content_text
+            .contains("additional text to bypass detection"),
         "should contain trailing text; got: {:?}",
         result.content_text
     );
@@ -309,7 +323,9 @@ fn test_formatting_within_p_no_links() {
 /// Formatting within <p>-tag with links: link tag preserved.
 #[test]
 fn test_formatting_within_p_with_links() {
-    let raw_html = html_doc(r#"<p><b>bold</b>, <i>italics</i>, <tt>tt</tt>, <strike>deleted</strike>, <u>underlined</u>, <a href="test.html">link</a> and additional text to bypass detection.</p>"#);
+    let raw_html = html_doc(
+        r#"<p><b>bold</b>, <i>italics</i>, <tt>tt</tt>, <strike>deleted</strike>, <u>underlined</u>, <a href="test.html">link</a> and additional text to bypass detection.</p>"#,
+    );
     let opts = {
         let mut c = Config::default();
         c.min_extracted_size = 0;
@@ -342,12 +358,16 @@ fn test_formatting_br_after_strong_produces_newline() {
     let result = trafilatura::extract(&html, zero_opts()).expect("extraction should succeed");
     // Both text fragments must be present.
     assert!(
-        result.content_text.contains("Staff Review of the Financial Situation"),
+        result
+            .content_text
+            .contains("Staff Review of the Financial Situation"),
         "strong text should be present; got: {:?}",
         result.content_text
     );
     assert!(
-        result.content_text.contains("Domestic financial conditions remained accommodative"),
+        result
+            .content_text
+            .contains("Domestic financial conditions remained accommodative"),
         "text after <br> should be present; got: {:?}",
         result.content_text
     );

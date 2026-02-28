@@ -26,7 +26,10 @@ pub fn trim(s: &str) -> String {
     // Strip soft hyphens (U+00AD) — Go's HTML parser removes them during tokenization.
     let no_soft_hyphen: String = s.chars().filter(|&c| c != '\u{00AD}').collect();
     // Collapse whitespace (split_whitespace handles all Unicode whitespace).
-    let joined = no_soft_hyphen.split_whitespace().collect::<Vec<_>>().join(" ");
+    let joined = no_soft_hyphen
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     // NFC normalization — Go's html.Parse normalizes NFD decomposed chars to NFC.
     joined.nfc().collect()
 }
@@ -86,7 +89,10 @@ pub(crate) fn is_image_file(src: &str) -> bool {
         .unwrap_or("");
 
     let ext_lower = ext.to_lowercase();
-    matches!(ext_lower.as_str(), "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "avif" | "tiff" | "tif" | "ico")
+    matches!(
+        ext_lower.as_str(),
+        "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "avif" | "tiff" | "tif" | "ico"
+    )
 }
 
 /// Deduplicate a list of strings split from comma/semicolon-separated inputs.
@@ -108,8 +114,7 @@ pub(crate) fn uniquify_lists(inputs: &[&str]) -> Vec<String> {
         };
 
         for entry in input.split(sep) {
-            let entry = trim(entry)
-                .replace(['"', '\''], "");
+            let entry = trim(entry).replace(['"', '\''], "");
             if !entry.is_empty() && seen.insert(entry.clone()) {
                 result.push(entry);
             }
@@ -183,7 +188,10 @@ pub(crate) fn unescape_html(s: &str) -> String {
         // Numeric character references — valid both with and without semicolon
         // (HTML5 spec §13.2.5.72 allows omitting ';' for numeric refs).
         if let Some(stripped) = entity.strip_prefix('#') {
-            let cp = if let Some(hex) = stripped.strip_prefix('x').or_else(|| stripped.strip_prefix('X')) {
+            let cp = if let Some(hex) = stripped
+                .strip_prefix('x')
+                .or_else(|| stripped.strip_prefix('X'))
+            {
                 u32::from_str_radix(hex, 16).ok()
             } else {
                 stripped.parse::<u32>().ok()
@@ -265,7 +273,9 @@ mod tests {
     fn test_is_image_file() {
         assert!(is_image_file("photo.jpg"));
         assert!(is_image_file("image.PNG"));
-        assert!(is_image_file("https://cdn.example.com/img/photo.webp?size=large"));
+        assert!(is_image_file(
+            "https://cdn.example.com/img/photo.webp?size=large"
+        ));
         assert!(!is_image_file("document.pdf"));
         assert!(!is_image_file("script.js"));
         assert!(!is_image_file(""));

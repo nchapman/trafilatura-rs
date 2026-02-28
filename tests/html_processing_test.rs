@@ -31,8 +31,7 @@ fn read_simple_fixture(name: &str) -> String {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("test-files/simple")
         .join(name);
-    std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Failed to read fixture {name}: {e}"))
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read fixture {name}: {e}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -74,8 +73,7 @@ fn test_exotic_misformed_html() {
 /// Empty blockquote → empty content (handleQuotes returns nil).
 #[test]
 fn test_exotic_empty_blockquote() {
-    let html =
-        r#"<html><body><article><blockquote></blockquote></article></body></html>"#;
+    let html = r#"<html><body><article><blockquote></blockquote></article></body></html>"#;
     let opts = {
         let mut o = Options::default();
         o.config = zero_config();
@@ -224,7 +222,9 @@ fn test_exotic_em_wrapping_p() {
         };
         let result = extract(html, opts).expect("extraction should succeed");
         assert!(
-            result.content_text.contains("em improperly wrapping p here"),
+            result
+                .content_text
+                .contains("em improperly wrapping p here"),
             "focus={focus:?}: Expected 'em improperly wrapping p here' in content, got: {:?}",
             result.content_text
         );
@@ -251,7 +251,9 @@ fn test_images_excluded_by_default() {
     };
     let result = extract(&html, opts).expect("extraction should succeed");
     assert!(
-        !result.content_html.contains(r#"<img src="test.jpg" title="Example image"/>"#),
+        !result
+            .content_html
+            .contains(r#"<img src="test.jpg" title="Example image"/>"#),
         "Image should not appear when include_images=false"
     );
 }
@@ -511,8 +513,7 @@ fn test_links_from_fixture() {
         o.config = zero_config();
         o
     };
-    let result_with_links =
-        extract(&html, opts_with_links).expect("extraction should succeed");
+    let result_with_links = extract(&html, opts_with_links).expect("extraction should succeed");
     assert!(
         result_with_links.content_html.contains("testlink.html"),
         "testlink.html should appear when include_links=true; html was: {}",
@@ -542,8 +543,7 @@ fn test_links_license_rel_stripped() {
 #[test]
 fn test_links_relative_url_conversion() {
     let html = r#"<html><body><p><a href="testlink.html">Test link text.</a>This part of the text has to be long enough.</p></body></html>"#;
-    let original_url =
-        url::Url::parse("https://www.example.com").expect("valid URL");
+    let original_url = url::Url::parse("https://www.example.com").expect("valid URL");
     let opts = {
         let mut o = Options::default();
         o.include_links = true;
@@ -576,16 +576,10 @@ fn prune_opts(selector: &str) -> Options {
 /// 50 `<p>abc</p>` elements with PruneSelector="p" → empty.
 #[test]
 fn test_prune_selector_all_p_removed() {
-    let html = format!(
-        "<html><body>{}</body></html>",
-        "<p>abc</p>".repeat(50)
-    );
+    let html = format!("<html><body>{}</body></html>", "<p>abc</p>".repeat(50));
     let result = extract(&html, prune_opts("p"));
     let text = result.map(|r| r.content_text).unwrap_or_default();
-    assert_eq!(
-        "", text,
-        "All <p> elements should be pruned, got: {text:?}"
-    );
+    assert_eq!("", text, "All <p> elements should be pruned, got: {text:?}");
 }
 
 /// h1 + 50×`<p>abc</p>` with PruneSelector="p" → only h1 text "ABC" remains.
@@ -629,8 +623,7 @@ fn test_prune_selector_p_and_h1_keeps_h2() {
         "<html><body><h1>ABC</h1><h2>42</h2>{}</body></html>",
         "<p>abc</p>".repeat(50)
     );
-    let result =
-        extract(&html, prune_opts("p, h1")).expect("extraction should succeed");
+    let result = extract(&html, prune_opts("p, h1")).expect("extraction should succeed");
     assert_eq!(
         "42", result.content_text,
         "Only h2 text should remain after pruning p and h1"
@@ -749,7 +742,8 @@ fn test_non_std_html_entities() {
 /// Mixed content (p + img + video) → only text extracted.
 #[test]
 fn test_mixed_content_extraction() {
-    let html = r#"<html><body><p>Text here</p><img src="img.jpg"/><video src="video.mp4"/></body></html>"#;
+    let html =
+        r#"<html><body><p>Text here</p><img src="img.jpg"/><video src="video.mp4"/></body></html>"#;
     let result = extract(html, zero_opts()).expect("extraction should succeed");
     assert_eq!(
         "Text here", result.content_text,

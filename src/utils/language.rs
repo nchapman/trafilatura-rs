@@ -279,10 +279,10 @@ mod tests {
         assert_eq!(to_iso639_1(Lang::Zul), "zu");
         assert_eq!(to_iso639_1(Lang::Cmn), "zh");
         // Non-obvious: ISO 639-3 code differs substantially from ISO 639-1.
-        assert_eq!(to_iso639_1(Lang::Pes), "fa");  // Persian
-        assert_eq!(to_iso639_1(Lang::Nob), "nb");  // Norwegian Bokmål (not "no")
-        assert_eq!(to_iso639_1(Lang::Hye), "hy");  // Armenian
-        assert_eq!(to_iso639_1(Lang::Kan), "kn");  // Kannada
+        assert_eq!(to_iso639_1(Lang::Pes), "fa"); // Persian
+        assert_eq!(to_iso639_1(Lang::Nob), "nb"); // Norwegian Bokmål (not "no")
+        assert_eq!(to_iso639_1(Lang::Hye), "hy"); // Armenian
+        assert_eq!(to_iso639_1(Lang::Kan), "kn"); // Kannada
     }
 
     #[test]

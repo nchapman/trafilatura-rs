@@ -1,7 +1,7 @@
 // Port of go-trafilatura/internal/etree/
 
-mod tree;
 mod query;
+mod tree;
 
 pub use ego_tree::NodeId;
 use scraper::Node;
@@ -24,7 +24,9 @@ impl Document {
     /// Uses html5ever's browser-grade HTML parser (same as scraper).
     pub fn parse(html: &str) -> Self {
         let html_doc = scraper::Html::parse_document(html);
-        Self { tree: html_doc.tree }
+        Self {
+            tree: html_doc.tree,
+        }
     }
 
     /// Return the NodeId of the tree root (a Document node, not an Element).
@@ -35,12 +37,15 @@ impl Document {
     /// Return the NodeId of the `<body>` element, if present.
     pub fn body(&self) -> Option<NodeId> {
         // Walk: root → html → body
-        let html_id = self.tree.root()
+        let html_id = self
+            .tree
+            .root()
             .children()
             .find(|n| matches!(n.value(), Node::Element(e) if e.name.local.as_ref() == "html"))?
             .id();
 
-        self.tree.get(html_id)?
+        self.tree
+            .get(html_id)?
             .children()
             .find(|n| matches!(n.value(), Node::Element(e) if e.name.local.as_ref() == "body"))
             .map(|n| n.id())

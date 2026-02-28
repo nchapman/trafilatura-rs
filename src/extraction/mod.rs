@@ -45,11 +45,8 @@ pub(crate) fn prune_unwanted_sections(
     if opts.focus != ExtractionFocus::FavorRecall {
         work = prune_unwanted_nodes(&work, selector::discard::DISCARDED_TEASER, false);
         if opts.focus == ExtractionFocus::FavorPrecision {
-            work = prune_unwanted_nodes(
-                &work,
-                selector::discard::PRECISION_DISCARDED_CONTENT,
-                false,
-            );
+            work =
+                prune_unwanted_nodes(&work, selector::discard::PRECISION_DISCARDED_CONTENT, false);
         }
     }
 
@@ -87,7 +84,13 @@ pub(crate) fn prune_unwanted_sections(
             }
         }
 
-        delete_by_link_density(&mut work, subtree, opts, false, &["h1", "h2", "h3", "h4", "h5", "h6", "summary"]);
+        delete_by_link_density(
+            &mut work,
+            subtree,
+            opts,
+            false,
+            &["h1", "h2", "h3", "h4", "h5", "h6", "summary"],
+        );
         delete_by_link_density(&mut work, subtree, opts, false, &["blockquote", "pre", "q"]);
     }
 
@@ -110,8 +113,15 @@ fn recover_wild_text(
 ) {
     tracing::info!("recovering wild text elements");
 
-    let mut selector_parts: Vec<&str> =
-        vec!["blockquote", "pre", "q", "code", "p", "table", "div[class*=\"w3-code\"]"];
+    let mut selector_parts: Vec<&str> = vec![
+        "blockquote",
+        "pre",
+        "q",
+        "code",
+        "p",
+        "table",
+        "div[class*=\"w3-code\"]",
+    ];
 
     if opts.focus == ExtractionFocus::FavorRecall {
         potential_tags.insert("div");
@@ -140,7 +150,8 @@ fn recover_wild_text(
     let elements = search_doc.query_selector_all(root, &selector_css);
 
     for &elem_id in &elements {
-        if let Some(html) = handle_text_elem(&mut search_doc, elem_id, potential_tags, cache, opts) {
+        if let Some(html) = handle_text_elem(&mut search_doc, elem_id, potential_tags, cache, opts)
+        {
             let tag = search_doc.tag_name(elem_id).to_string();
             result_elems.push((html, tag));
         }
@@ -211,7 +222,11 @@ pub(crate) fn extract_content(
             .map(|id| doc.text_content(id))
             .collect();
 
-        let factor: usize = if opts.focus == ExtractionFocus::FavorPrecision { 1 } else { 3 };
+        let factor: usize = if opts.focus == ExtractionFocus::FavorPrecision {
+            1
+        } else {
+            3
+        };
         if paragraph_text.is_empty()
             || paragraph_text.chars().count() < opts.config.min_extracted_size * factor
         {
@@ -230,10 +245,7 @@ pub(crate) fn extract_content(
         let mut sub_elements = work.get_elements_by_tag_name(work_body, "*");
 
         // If the only sub-elements are <br>, process the subtree root directly.
-        let tag_set: HashSet<&str> = sub_elements
-            .iter()
-            .map(|&id| work.tag_name(id))
-            .collect();
+        let tag_set: HashSet<&str> = sub_elements.iter().map(|&id| work.tag_name(id)).collect();
         if tag_set.len() == 1 && tag_set.contains("br") {
             sub_elements = vec![work_body];
         }
@@ -241,9 +253,7 @@ pub(crate) fn extract_content(
         // Process each element.
         let batch_start = result_elems.len();
         for &elem_id in &sub_elements {
-            if let Some(html) =
-                handle_text_elem(&mut work, elem_id, &potential_tags, cache, opts)
-            {
+            if let Some(html) = handle_text_elem(&mut work, elem_id, &potential_tags, cache, opts) {
                 let tag = work.tag_name(elem_id).to_string();
                 result_elems.push((html, tag));
             }
@@ -333,18 +343,16 @@ pub(crate) fn extract_comments(
 
     'comment_loop: for &rule in selector::comments::COMMENTS {
         // Find the comment section root in the original document (for later removal).
-        let sub_id_in_doc =
-            match selector::query(doc, doc.root(), std::slice::from_ref(&rule)) {
-                Some(id) => id,
-                None => continue,
-            };
+        let sub_id_in_doc = match selector::query(doc, doc.root(), std::slice::from_ref(&rule)) {
+            Some(id) => id,
+            None => continue,
+        };
 
         // Clone and prune a working copy, then re-query it to get the subtree root.
         // We re-query rather than reusing the NodeId from `doc` because `prune_unwanted_nodes`
         // removes matched nodes from the clone, and a NodeId from `doc` may point to a
         // detached or absent node in `work` if the comment root was pruned.
-        let mut work =
-            prune_unwanted_nodes(doc, selector::discard::DISCARDED_COMMENTS, false);
+        let mut work = prune_unwanted_nodes(doc, selector::discard::DISCARDED_COMMENTS, false);
         let sub_id = match selector::query(&work, work.root(), std::slice::from_ref(&rule)) {
             Some(id) => id,
             None => continue,
@@ -463,7 +471,10 @@ mod tests {
         </body></html>"#;
         let doc = Document::parse(html);
         let potential_tags: HashSet<&str> = HashSet::new();
-        let opts = Options { include_images: false, ..Options::default() };
+        let opts = Options {
+            include_images: false,
+            ..Options::default()
+        };
         let result = prune_unwanted_sections(&doc, &potential_tags, &opts);
         // Caption div should be pruned.
         assert!(
@@ -539,7 +550,8 @@ mod tests {
         let p_id = doc.children(body)[0];
         let potential_tags: HashSet<&str> = TAG_CATALOG.iter().copied().collect();
         let mut cache = make_cache();
-        let result = process_comments_node(&mut doc, p_id, &potential_tags, &mut cache, &default_opts());
+        let result =
+            process_comments_node(&mut doc, p_id, &potential_tags, &mut cache, &default_opts());
         assert!(result.is_some(), "expected Some, got None");
         let html = result.unwrap();
         assert!(html.contains("A comment text"), "got: {html}");
@@ -554,7 +566,13 @@ mod tests {
         let potential_tags: HashSet<&str> = TAG_CATALOG.iter().copied().collect();
         let mut cache = make_cache();
         // "nav" is not in TAG_CATALOG (potential_tags), so it should return None.
-        let result = process_comments_node(&mut doc, nav_id, &potential_tags, &mut cache, &default_opts());
+        let result = process_comments_node(
+            &mut doc,
+            nav_id,
+            &potential_tags,
+            &mut cache,
+            &default_opts(),
+        );
         assert!(result.is_none(), "nav should not be included in comments");
     }
 

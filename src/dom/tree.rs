@@ -1,9 +1,9 @@
 // Port of go-trafilatura/internal/etree/element.go and etree.go
 
 use ego_tree::NodeId;
-use html5ever::{LocalName, QualName, ns};
-use scraper::Node;
+use html5ever::{ns, LocalName, QualName};
 use scraper::node::{Element, Text};
+use scraper::Node;
 use tendril::StrTendril;
 
 use super::Document;
@@ -14,8 +14,8 @@ const MAX_TREE_DEPTH: usize = 500;
 
 /// HTML void elements — those that cannot have children.
 const VOID_ELEMENTS: &[&str] = &[
-    "area", "base", "br", "col", "embed", "hr", "img", "input",
-    "link", "meta", "param", "source", "track", "wbr",
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
+    "track", "wbr",
 ];
 
 // ---------------------------------------------------------------------------
@@ -32,7 +32,9 @@ fn make_element(tag: &str) -> Node {
 
 /// Create a Text node value.
 fn make_text(text: &str) -> Node {
-    Node::Text(Text { text: StrTendril::from(text) })
+    Node::Text(Text {
+        text: StrTendril::from(text),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -102,8 +104,7 @@ impl Document {
             if let Node::Element(e) = node_mut.value() {
                 // Update existing or push new entry (attrs is Vec<(QualName, StrTendril)>).
                 let local = LocalName::from(name);
-                let found = e.attrs.iter_mut()
-                    .find(|(k, _)| k.local == local);
+                let found = e.attrs.iter_mut().find(|(k, _)| k.local == local);
                 if let Some(entry) = found {
                     entry.1 = StrTendril::from(value);
                 } else {
@@ -136,7 +137,11 @@ impl Document {
     /// Returns all attribute names for an element.
     pub fn attribute_names(&self, id: NodeId) -> Vec<String> {
         if let Some(Node::Element(e)) = self.tree.get(id).map(|n| n.value()) {
-            return e.attrs.iter().map(|(k, _)| k.local.as_ref().to_string()).collect();
+            return e
+                .attrs
+                .iter()
+                .map(|(k, _)| k.local.as_ref().to_string())
+                .collect();
         }
         Vec::new()
     }
@@ -154,17 +159,21 @@ impl Document {
 
     /// Returns the element children (skipping text/comment nodes).
     pub fn children(&self, id: NodeId) -> Vec<NodeId> {
-        self.tree.get(id)
-            .map(|n| n.children()
-                .filter(|c| matches!(c.value(), Node::Element(_)))
-                .map(|c| c.id())
-                .collect())
+        self.tree
+            .get(id)
+            .map(|n| {
+                n.children()
+                    .filter(|c| matches!(c.value(), Node::Element(_)))
+                    .map(|c| c.id())
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
     /// Returns all children including text and comment nodes.
     pub fn child_nodes(&self, id: NodeId) -> Vec<NodeId> {
-        self.tree.get(id)
+        self.tree
+            .get(id)
             .map(|n| n.children().map(|c| c.id()).collect())
             .unwrap_or_default()
     }
@@ -206,7 +215,9 @@ impl Document {
     ///
     /// Port of `etree.Text`.
     pub fn text(&self, id: NodeId) -> String {
-        let Some(node) = self.tree.get(id) else { return String::new() };
+        let Some(node) = self.tree.get(id) else {
+            return String::new();
+        };
         let mut out = String::new();
         for child in node.children() {
             match child.value() {
@@ -222,11 +233,15 @@ impl Document {
     ///
     /// Port of `etree.SetText`.
     pub fn set_text(&mut self, id: NodeId, text: &str) {
-        if self.is_void_element(id) { return; }
+        if self.is_void_element(id) {
+            return;
+        }
 
         // Remove existing leading text nodes (up to first element child).
         let to_remove: Vec<NodeId> = {
-            let Some(node) = self.tree.get(id) else { return };
+            let Some(node) = self.tree.get(id) else {
+                return;
+            };
             node.children()
                 .take_while(|c| !matches!(c.value(), Node::Element(_)))
                 .filter(|c| matches!(c.value(), Node::Text(_)))
@@ -234,17 +249,32 @@ impl Document {
                 .collect()
         };
         for tid in to_remove {
-            self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
+            self.tree
+                .get_mut(tid)
+                .expect("tail/text NodeId from same tree")
+                .detach();
         }
 
         // Insert new text node at the front.
         if !text.is_empty() {
             let new_node_val = make_text(text);
-            let first_child = self.tree.get(id).expect("callers hold valid NodeIds from this tree").children().next().map(|c| c.id());
+            let first_child = self
+                .tree
+                .get(id)
+                .expect("callers hold valid NodeIds from this tree")
+                .children()
+                .next()
+                .map(|c| c.id());
             if let Some(first_id) = first_child {
-                self.tree.get_mut(first_id).expect("child NodeId from same tree").insert_before(new_node_val);
+                self.tree
+                    .get_mut(first_id)
+                    .expect("child NodeId from same tree")
+                    .insert_before(new_node_val);
             } else {
-                self.tree.get_mut(id).expect("callers hold valid NodeIds from this tree").append(new_node_val);
+                self.tree
+                    .get_mut(id)
+                    .expect("callers hold valid NodeIds from this tree")
+                    .append(new_node_val);
             }
         }
     }
@@ -268,7 +298,9 @@ impl Document {
     ///
     /// Port of `etree.TailNodes`.
     pub fn tail_nodes(&self, id: NodeId) -> Vec<NodeId> {
-        let Some(node) = self.tree.get(id) else { return Vec::new() };
+        let Some(node) = self.tree.get(id) else {
+            return Vec::new();
+        };
         let mut tails = Vec::new();
         let mut cur = node.next_sibling();
         while let Some(sib) = cur {
@@ -295,18 +327,34 @@ impl Document {
         // Remove existing tail text nodes.
         let old_tails = self.tail_nodes(id);
         for tid in old_tails {
-            self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
+            self.tree
+                .get_mut(tid)
+                .expect("tail/text NodeId from same tree")
+                .detach();
         }
 
-        if tail.is_empty() { return; }
+        if tail.is_empty() {
+            return;
+        }
 
         // Insert new tail node.
         let new_tail = make_text(tail);
-        let next_sib = self.tree.get(id).expect("id validated by parent check above").next_sibling().map(|n| n.id());
+        let next_sib = self
+            .tree
+            .get(id)
+            .expect("id validated by parent check above")
+            .next_sibling()
+            .map(|n| n.id());
         if let Some(next_id) = next_sib {
-            self.tree.get_mut(next_id).expect("sibling NodeId from same tree").insert_before(new_tail);
+            self.tree
+                .get_mut(next_id)
+                .expect("sibling NodeId from same tree")
+                .insert_before(new_tail);
         } else {
-            self.tree.get_mut(parent_id).expect("parent_id validated above").append(new_tail);
+            self.tree
+                .get_mut(parent_id)
+                .expect("parent_id validated above")
+                .append(new_tail);
         }
     }
 }
@@ -330,7 +378,11 @@ impl Document {
     ///
     /// Port of `etree.SubElement`.
     pub fn sub_element(&mut self, parent: NodeId, tag: &str) -> NodeId {
-        self.tree.get_mut(parent).expect("parent NodeId must be valid").append(make_element(tag)).id()
+        self.tree
+            .get_mut(parent)
+            .expect("parent NodeId must be valid")
+            .append(make_element(tag))
+            .id()
     }
 
     /// Appends `child` (and its tail text nodes) to `parent` by cloning.
@@ -338,7 +390,9 @@ impl Document {
     /// Port of `etree.Append` — moves element + tail into new parent.
     pub fn append_child(&mut self, parent: NodeId, child: NodeId) {
         // Collect tail text before mutating.
-        let tail_texts: Vec<String> = self.tail_nodes(child).iter()
+        let tail_texts: Vec<String> = self
+            .tail_nodes(child)
+            .iter()
             .filter_map(|&tid| {
                 if let Some(Node::Text(t)) = self.tree.get(tid).map(|n| n.value()) {
                     Some((**t).to_string())
@@ -355,14 +409,23 @@ impl Document {
 
         // Append cloned tail text nodes.
         for text in &tail_texts {
-            self.tree.get_mut(parent).expect("parent NodeId must be valid").append(make_text(text));
+            self.tree
+                .get_mut(parent)
+                .expect("parent NodeId must be valid")
+                .append(make_text(text));
         }
 
         // Detach original tail nodes and original child.
         for tid in old_tail_ids {
-            self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
+            self.tree
+                .get_mut(tid)
+                .expect("tail/text NodeId from same tree")
+                .detach();
         }
-        self.tree.get_mut(child).expect("child NodeId must be valid").detach();
+        self.tree
+            .get_mut(child)
+            .expect("child NodeId must be valid")
+            .detach();
     }
 
     /// Appends multiple children into `parent`.
@@ -385,15 +448,23 @@ impl Document {
     ///
     /// Port of `etree.Remove`.
     pub fn remove(&mut self, id: NodeId, keep_tail: bool) {
-        if self.tree.get(id).is_none() { return; }
+        if self.tree.get(id).is_none() {
+            return;
+        }
 
         if !keep_tail {
             let tails = self.tail_nodes(id);
             for tid in tails {
-                self.tree.get_mut(tid).expect("tail/text NodeId from same tree").detach();
+                self.tree
+                    .get_mut(tid)
+                    .expect("tail/text NodeId from same tree")
+                    .detach();
             }
         }
-        self.tree.get_mut(id).expect("id validated at top of remove()").detach();
+        self.tree
+            .get_mut(id)
+            .expect("id validated at top of remove()")
+            .detach();
     }
 
     /// Removes an element but preserves its children (merged into parent) and
@@ -401,10 +472,17 @@ impl Document {
     ///
     /// Port of `etree.Strip`.
     pub fn strip(&mut self, id: NodeId) {
-        let Some(parent) = self.parent(id) else { return };
+        let Some(parent) = self.parent(id) else {
+            return;
+        };
 
         let child_ids: Vec<NodeId> = self.child_nodes(id);
-        let next_sib = self.tree.get(id).expect("id validated by parent check").next_sibling().map(|n| n.id());
+        let next_sib = self
+            .tree
+            .get(id)
+            .expect("id validated by parent check")
+            .next_sibling()
+            .map(|n| n.id());
 
         // Clone each child and insert before `id`'s position.
         for child_id in child_ids {
@@ -416,7 +494,10 @@ impl Document {
         }
 
         // Detach the stripped element (leave tail nodes in place).
-        self.tree.get_mut(id).expect("id validated by parent check").detach();
+        self.tree
+            .get_mut(id)
+            .expect("id validated by parent check")
+            .detach();
     }
 
     /// Removes elements with any of the given tags but keeps their text/children.
@@ -458,8 +539,12 @@ impl Document {
     }
 
     fn collect_comment_nodes_inner(&self, id: NodeId, out: &mut Vec<NodeId>, depth: usize) {
-        if depth >= MAX_TREE_DEPTH { return; }
-        let Some(node) = self.tree.get(id) else { return };
+        if depth >= MAX_TREE_DEPTH {
+            return;
+        }
+        let Some(node) = self.tree.get(id) else {
+            return;
+        };
         for child in node.children() {
             let child_id = child.id();
             if let Node::Comment(_) = child.value() {
@@ -476,7 +561,10 @@ impl Document {
     pub fn remove_comment(&mut self, id: NodeId) {
         if let Some(node) = self.tree.get(id) {
             if matches!(node.value(), Node::Comment(_)) {
-                self.tree.get_mut(id).expect("id validated by get() above").detach();
+                self.tree
+                    .get_mut(id)
+                    .expect("id validated by get() above")
+                    .detach();
             }
         }
     }
@@ -521,13 +609,33 @@ impl Document {
         self.clone_subtree_into_inner(source, target_parent, 0)
     }
 
-    fn clone_subtree_into_inner(&mut self, source: NodeId, target_parent: NodeId, depth: usize) -> NodeId {
-        let val = self.tree.get(source).expect("source NodeId must be valid").value().clone();
-        let new_id = self.tree.get_mut(target_parent).expect("target_parent NodeId must be valid").append(val).id();
+    fn clone_subtree_into_inner(
+        &mut self,
+        source: NodeId,
+        target_parent: NodeId,
+        depth: usize,
+    ) -> NodeId {
+        let val = self
+            .tree
+            .get(source)
+            .expect("source NodeId must be valid")
+            .value()
+            .clone();
+        let new_id = self
+            .tree
+            .get_mut(target_parent)
+            .expect("target_parent NodeId must be valid")
+            .append(val)
+            .id();
 
         if depth < MAX_TREE_DEPTH {
-            let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
-                .children().map(|c| c.id()).collect();
+            let children: Vec<NodeId> = self
+                .tree
+                .get(source)
+                .expect("source NodeId must be valid")
+                .children()
+                .map(|c| c.id())
+                .collect();
             for child_id in children {
                 self.clone_subtree_into_inner(child_id, new_id, depth + 1);
             }
@@ -536,14 +644,33 @@ impl Document {
     }
 
     /// Deep-clone `source` and insert it immediately before `target_sibling`.
-    pub(crate) fn clone_subtree_before(&mut self, source: NodeId, target_sibling: NodeId) -> NodeId {
-        let val = self.tree.get(source).expect("source NodeId must be valid").value().clone();
-        let new_id = self.tree.get_mut(target_sibling).expect("target_sibling NodeId must be valid").insert_before(val).id();
+    pub(crate) fn clone_subtree_before(
+        &mut self,
+        source: NodeId,
+        target_sibling: NodeId,
+    ) -> NodeId {
+        let val = self
+            .tree
+            .get(source)
+            .expect("source NodeId must be valid")
+            .value()
+            .clone();
+        let new_id = self
+            .tree
+            .get_mut(target_sibling)
+            .expect("target_sibling NodeId must be valid")
+            .insert_before(val)
+            .id();
 
         // Root is depth 0 (unconditionally cloned above); children start at depth 1,
         // matching clone_subtree_into's behavior via clone_subtree_into_inner(child, new_id, 0+1).
-        let children: Vec<NodeId> = self.tree.get(source).expect("source NodeId must be valid")
-            .children().map(|c| c.id()).collect();
+        let children: Vec<NodeId> = self
+            .tree
+            .get(source)
+            .expect("source NodeId must be valid")
+            .children()
+            .map(|c| c.id())
+            .collect();
         for child_id in children {
             self.clone_subtree_into_inner(child_id, new_id, 1);
         }
@@ -567,12 +694,25 @@ impl Document {
         target_parent: NodeId,
         depth: usize,
     ) -> NodeId {
-        let val = source_tree.get(source_id).expect("source_id must be valid in source tree").value().clone();
-        let new_id = self.tree.get_mut(target_parent).expect("target_parent NodeId must be valid").append(val).id();
+        let val = source_tree
+            .get(source_id)
+            .expect("source_id must be valid in source tree")
+            .value()
+            .clone();
+        let new_id = self
+            .tree
+            .get_mut(target_parent)
+            .expect("target_parent NodeId must be valid")
+            .append(val)
+            .id();
 
         if depth < MAX_TREE_DEPTH {
-            let children: Vec<NodeId> = source_tree.get(source_id).expect("source_id must be valid in source tree")
-                .children().map(|c| c.id()).collect();
+            let children: Vec<NodeId> = source_tree
+                .get(source_id)
+                .expect("source_id must be valid in source tree")
+                .children()
+                .map(|c| c.id())
+                .collect();
             for child_id in children {
                 self.clone_from_tree_inner(source_tree, child_id, new_id, depth + 1);
             }
@@ -584,7 +724,9 @@ impl Document {
     ///
     /// Port of `dom.Clone(doc, true)`.
     pub fn clone_document(&self) -> Document {
-        Document { tree: self.tree.clone() }
+        Document {
+            tree: self.tree.clone(),
+        }
     }
 
     /// Extracts the children of `id` into a fresh `<html><body>` document.
@@ -594,8 +736,13 @@ impl Document {
     pub fn extract_subtree_as_document(&self, id: NodeId) -> Document {
         let mut new_doc = Document::parse("<html><body></body></html>");
         let body = new_doc.body().expect("freshly parsed document has body");
-        let children: Vec<NodeId> = self.tree.get(id).expect("id must be valid in source document")
-            .children().map(|c| c.id()).collect();
+        let children: Vec<NodeId> = self
+            .tree
+            .get(id)
+            .expect("id must be valid in source document")
+            .children()
+            .map(|c| c.id())
+            .collect();
         for child_id in children {
             new_doc.clone_from_tree(&self.tree, child_id, body);
         }
@@ -627,9 +774,20 @@ impl Document {
         result
     }
 
-    fn collect_iter(&self, id: NodeId, tags: &[&str], include_self: bool, out: &mut Vec<NodeId>, depth: usize) {
-        if depth >= MAX_TREE_DEPTH { return; }
-        let Some(node) = self.tree.get(id) else { return };
+    fn collect_iter(
+        &self,
+        id: NodeId,
+        tags: &[&str],
+        include_self: bool,
+        out: &mut Vec<NodeId>,
+        depth: usize,
+    ) {
+        if depth >= MAX_TREE_DEPTH {
+            return;
+        }
+        let Some(node) = self.tree.get(id) else {
+            return;
+        };
 
         // Only include Element nodes in results; always recurse into children.
         if let Node::Element(e) = node.value() {
@@ -662,8 +820,12 @@ impl Document {
         buf: &mut String,
         last_level: &mut usize,
     ) {
-        if level >= MAX_TREE_DEPTH { return; }
-        let Some(node) = self.tree.get(id) else { return };
+        if level >= MAX_TREE_DEPTH {
+            return;
+        }
+        let Some(node) = self.tree.get(id) else {
+            return;
+        };
 
         match node.value() {
             Node::Element(e) => {
@@ -697,8 +859,12 @@ impl Document {
     }
 
     fn collect_text(&self, id: NodeId, out: &mut String, depth: usize) {
-        if depth >= MAX_TREE_DEPTH { return; }
-        let Some(node) = self.tree.get(id) else { return };
+        if depth >= MAX_TREE_DEPTH {
+            return;
+        }
+        let Some(node) = self.tree.get(id) else {
+            return;
+        };
         if let Node::Text(t) = node.value() {
             out.push_str(t.as_ref());
         }
@@ -715,7 +881,9 @@ impl Document {
 impl Document {
     /// Serializes an element to its outer HTML.
     pub fn outer_html(&self, id: NodeId) -> String {
-        let Some(node_ref) = self.tree.get(id) else { return String::new() };
+        let Some(node_ref) = self.tree.get(id) else {
+            return String::new();
+        };
 
         // Handle text nodes (no wrapping element).
         if let Node::Text(t) = node_ref.value() {
@@ -731,7 +899,9 @@ impl Document {
 
     /// Serializes the inner HTML of an element (its children only).
     pub fn inner_html(&self, id: NodeId) -> String {
-        let Some(node_ref) = self.tree.get(id) else { return String::new() };
+        let Some(node_ref) = self.tree.get(id) else {
+            return String::new();
+        };
         if let Some(elem_ref) = scraper::ElementRef::wrap(node_ref) {
             return elem_ref.inner_html();
         }
@@ -753,7 +923,9 @@ impl Document {
     pub fn from_string(html: &str) -> Option<(Document, NodeId)> {
         let doc = Document::parse(html);
         let body_id = doc.body()?;
-        let first_child = doc.tree.get(body_id)?
+        let first_child = doc
+            .tree
+            .get(body_id)?
             .children()
             .find(|n| matches!(n.value(), Node::Element(_)))?
             .id();
@@ -1029,7 +1201,10 @@ mod tests {
         d.strip_tags(body, &["div", "p"]);
         let text = d.text_content(body);
         assert!(text.contains("text"), "text content must survive");
-        assert!(d.children(body).is_empty(), "no element children should remain");
+        assert!(
+            d.children(body).is_empty(),
+            "no element children should remain"
+        );
     }
 
     #[test]
@@ -1102,8 +1277,14 @@ mod tests {
         let mut d = doc("<div><div><p>gone</p></div></div>");
         let body = d.body().unwrap();
         d.strip_elements(body, false, &["div", "p"]);
-        assert!(d.children(body).is_empty(), "all matching elements must be removed");
-        assert!(!d.text_content(body).contains("gone"), "removed elements' text must be gone");
+        assert!(
+            d.children(body).is_empty(),
+            "all matching elements must be removed"
+        );
+        assert!(
+            !d.text_content(body).contains("gone"),
+            "removed elements' text must be gone"
+        );
     }
 
     #[test]
@@ -1141,7 +1322,10 @@ mod tests {
         d.strip_elements(div, true, &["script"]);
         let text = d.text_content(div);
         assert!(!text.contains("rm"), "script content must be gone");
-        assert!(text.contains("tail-text"), "tail text must survive when keep_tail=true");
+        assert!(
+            text.contains("tail-text"),
+            "tail text must survive when keep_tail=true"
+        );
     }
 
     #[test]
@@ -1153,7 +1337,10 @@ mod tests {
         d.strip_elements(div, false, &["script"]);
         let text = d.text_content(div);
         assert!(!text.contains("rm"), "script content must be gone");
-        assert!(!text.contains("tail-text"), "tail text must be discarded when keep_tail=false");
+        assert!(
+            !text.contains("tail-text"),
+            "tail text must be discarded when keep_tail=false"
+        );
     }
 
     #[test]
@@ -1220,10 +1407,16 @@ mod tests {
         let sub = d.extract_subtree_as_document(article);
         let sub_body = sub.body().unwrap();
         // Comment should be present among body's children.
-        let has_comment = sub.tree.get(sub_body).unwrap()
+        let has_comment = sub
+            .tree
+            .get(sub_body)
+            .unwrap()
             .children()
             .any(|c| matches!(c.value(), Node::Comment(_)));
-        assert!(has_comment, "comment node must be copied into the subtree document");
+        assert!(
+            has_comment,
+            "comment node must be copied into the subtree document"
+        );
     }
 
     #[test]

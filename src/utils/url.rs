@@ -32,7 +32,10 @@ pub(crate) fn create_absolute_url(url_str: &str, base: Option<&Url>) -> String {
     }
 
     // Passthrough cases.
-    if url_str.starts_with('#') || url_str.starts_with("data:") || url_str.starts_with("javascript:") {
+    if url_str.starts_with('#')
+        || url_str.starts_with("data:")
+        || url_str.starts_with("javascript:")
+    {
         return url_str.to_string();
     }
 
@@ -109,9 +112,18 @@ mod tests {
     fn test_create_absolute_url_passthrough() {
         let base = Url::parse("https://example.com/page").unwrap();
         assert_eq!(create_absolute_url("#section", Some(&base)), "#section");
-        assert_eq!(create_absolute_url("data:image/png;base64,xxx", Some(&base)), "data:image/png;base64,xxx");
-        assert_eq!(create_absolute_url("javascript:void(0)", Some(&base)), "javascript:void(0)");
-        assert_eq!(create_absolute_url("https://other.com/path", Some(&base)), "https://other.com/path");
+        assert_eq!(
+            create_absolute_url("data:image/png;base64,xxx", Some(&base)),
+            "data:image/png;base64,xxx"
+        );
+        assert_eq!(
+            create_absolute_url("javascript:void(0)", Some(&base)),
+            "javascript:void(0)"
+        );
+        assert_eq!(
+            create_absolute_url("https://other.com/path", Some(&base)),
+            "https://other.com/path"
+        );
     }
 
     #[test]
@@ -124,12 +136,18 @@ mod tests {
     #[test]
     fn test_create_absolute_url_no_base() {
         assert_eq!(create_absolute_url("/path", None), "/path");
-        assert_eq!(create_absolute_url("", Some(&Url::parse("https://example.com").unwrap())), "");
+        assert_eq!(
+            create_absolute_url("", Some(&Url::parse("https://example.com").unwrap())),
+            ""
+        );
     }
 
     #[test]
     fn test_get_domain_url() {
-        assert_eq!(get_domain_url("https://www.example.com/path"), "www.example.com");
+        assert_eq!(
+            get_domain_url("https://www.example.com/path"),
+            "www.example.com"
+        );
         assert_eq!(get_domain_url("http://blog.test.org"), "blog.test.org");
         assert_eq!(get_domain_url("/relative"), "");
         assert_eq!(get_domain_url("not-a-url"), "");
@@ -137,7 +155,10 @@ mod tests {
 
     #[test]
     fn test_get_base_url() {
-        assert_eq!(get_base_url("https://www.example.com/path?q=1"), "https://www.example.com");
+        assert_eq!(
+            get_base_url("https://www.example.com/path?q=1"),
+            "https://www.example.com"
+        );
         assert_eq!(get_base_url("http://example.com"), "http://example.com");
         assert_eq!(get_base_url("/relative"), "");
     }

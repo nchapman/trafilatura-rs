@@ -20,7 +20,11 @@ pub(crate) struct SchemaData {
 }
 
 /// Port of `extractJsonLd`.
-pub(crate) fn extract_json_ld(opts: &Options, doc: &Document, original_metadata: Metadata) -> Metadata {
+pub(crate) fn extract_json_ld(
+    opts: &Options,
+    doc: &Document,
+    original_metadata: Metadata,
+) -> Metadata {
     let mut metadata = Metadata::default();
     let (persons, organizations, articles) = decode_json_ld(doc, opts);
 
@@ -41,7 +45,11 @@ pub(crate) fn extract_json_ld(opts: &Options, doc: &Document, original_metadata:
 
         // Grab sitename from publisher.
         if metadata.sitename.is_empty() {
-            let pub_val = article.data.get("publisher").cloned().unwrap_or(Value::Null);
+            let pub_val = article
+                .data
+                .get("publisher")
+                .cloned()
+                .unwrap_or(Value::Null);
             let names = get_schema_names(&pub_val, &[]);
             if !names.is_empty() {
                 metadata.sitename = names[0].clone();
@@ -81,9 +89,7 @@ pub(crate) fn extract_json_ld(opts: &Options, doc: &Document, original_metadata:
         }
 
         // If title found, use article type as page type.
-        if metadata.page_type.is_empty()
-            && !metadata.title.is_empty()
-            && !article.types.is_empty()
+        if metadata.page_type.is_empty() && !metadata.title.is_empty() && !article.types.is_empty()
         {
             metadata.page_type = article.types[0].clone();
         }
@@ -170,9 +176,8 @@ fn decode_json_ld(
     // Find all script nodes with JSON+LD schema.
     let mut script_ids =
         doc.query_selector_all(doc.root(), r#"script[type="application/ld+json"]"#);
-    script_ids.extend(
-        doc.query_selector_all(doc.root(), r#"script[type="application/settings+json"]"#),
-    );
+    script_ids
+        .extend(doc.query_selector_all(doc.root(), r#"script[type="application/settings+json"]"#));
 
     for script_id in script_ids {
         let json_text = doc.text_content(script_id);
@@ -302,10 +307,8 @@ fn find_important_objects(
     }
 
     // Recurse into sub-objects.
-    let child_parent_ctx: (&[String], Option<&[String]>) = (
-        &schema_types,
-        parent_ctx.map(|(pt, _)| pt),
-    );
+    let child_parent_ctx: (&[String], Option<&[String]>) =
+        (&schema_types, parent_ctx.map(|(pt, _)| pt));
     for (_, value) in obj {
         match value {
             Value::Object(child_obj) => {
@@ -352,7 +355,11 @@ pub(crate) fn get_schema_names(v: &Value, expected_types: &[&str]) -> Vec<String
                 s.clone()
             };
             let value = trim(&value);
-            if value.is_empty() { vec![] } else { vec![value] }
+            if value.is_empty() {
+                vec![]
+            } else {
+                vec![value]
+            }
         }
 
         Value::Object(obj) => {
@@ -363,7 +370,9 @@ pub(crate) fn get_schema_names(v: &Value, expected_types: &[&str]) -> Vec<String
                 if schema_types.is_empty() {
                     return vec![];
                 }
-                let allowed = schema_types.iter().any(|t| expected_types.contains(&t.as_str()));
+                let allowed = schema_types
+                    .iter()
+                    .any(|t| expected_types.contains(&t.as_str()));
                 if !allowed {
                     return vec![];
                 }
@@ -431,14 +440,22 @@ pub(crate) fn get_string_values(obj: &Map<String, Value>, key: &str) -> Vec<Stri
     match obj.get(key) {
         Some(Value::String(s)) => {
             let s = trim(s);
-            if s.is_empty() { vec![] } else { vec![s] }
+            if s.is_empty() {
+                vec![]
+            } else {
+                vec![s]
+            }
         }
         Some(Value::Array(arr)) => arr
             .iter()
             .filter_map(|item| {
                 if let Value::String(s) = item {
                     let s = trim(s);
-                    if !s.is_empty() { Some(s) } else { None }
+                    if !s.is_empty() {
+                        Some(s)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -450,7 +467,10 @@ pub(crate) fn get_string_values(obj: &Map<String, Value>, key: &str) -> Vec<Stri
 
 /// Port of `getSingleStringValue`.
 pub(crate) fn get_single_string_value(obj: &Map<String, Value>, key: &str) -> String {
-    get_string_values(obj, key).into_iter().next().unwrap_or_default()
+    get_string_values(obj, key)
+        .into_iter()
+        .next()
+        .unwrap_or_default()
 }
 
 /// Port of `schemaInArticle`.
@@ -467,17 +487,16 @@ fn schema_in_article(data: &SchemaData, wanted_type: &str) -> bool {
         t == "website" || t.contains("organization")
     });
 
-    let types_to_check =
-        if (wanted_type == "person" && parent_is_person)
-            || (wanted_type == "organization" && parent_is_organization)
-        {
-            match &data.grandparent_types {
-                None => return true,
-                Some(gpt) => gpt,
-            }
-        } else {
-            parent_types
-        };
+    let types_to_check = if (wanted_type == "person" && parent_is_person)
+        || (wanted_type == "organization" && parent_is_organization)
+    {
+        match &data.grandparent_types {
+            None => return true,
+            Some(gpt) => gpt,
+        }
+    } else {
+        parent_types
+    };
 
     is_article_type_list(types_to_check)
 }

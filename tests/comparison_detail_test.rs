@@ -56,9 +56,9 @@ fn load_html(file: &str) -> Option<String> {
                 let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);
                 return Some(decoded.into_owned());
             }
-            return String::from_utf8(bytes)
-                .ok()
-                .or_else(|| Some(String::from_utf8_lossy(&std::fs::read(&path).ok()?).into_owned()));
+            return String::from_utf8(bytes).ok().or_else(|| {
+                Some(String::from_utf8_lossy(&std::fs::read(&path).ok()?).into_owned())
+            });
         }
     }
     None
@@ -80,7 +80,10 @@ fn comparison_detail() {
     for entry in &entries {
         let html = match load_html(&entry.file) {
             Some(h) => h,
-            None => { skipped += 1; continue; }
+            None => {
+                skipped += 1;
+                continue;
+            }
         };
 
         let url = url::Url::parse(&entry.url).ok();
@@ -106,14 +109,30 @@ fn comparison_detail() {
 
         for s in &entry.with {
             let found = text.contains(s.as_str());
-            details.push(Detail { kind: "with".into(), string: s.clone(), found });
-            if found { tp += 1; } else { fn_ += 1; }
+            details.push(Detail {
+                kind: "with".into(),
+                string: s.clone(),
+                found,
+            });
+            if found {
+                tp += 1;
+            } else {
+                fn_ += 1;
+            }
         }
 
         for s in &entry.without {
             let found = text.contains(s.as_str());
-            details.push(Detail { kind: "without".into(), string: s.clone(), found });
-            if found { fp += 1; } else { tn += 1; }
+            details.push(Detail {
+                kind: "without".into(),
+                string: s.clone(),
+                found,
+            });
+            if found {
+                fp += 1;
+            } else {
+                tn += 1;
+            }
         }
 
         total_tp += tp;
@@ -126,19 +145,35 @@ fn comparison_detail() {
             file: entry.file.clone(),
             url: entry.url.clone(),
             text_len: text.len(),
-            tp, fn_: fn_, fp, tn, details,
+            tp,
+            fn_: fn_,
+            fp,
+            tn,
+            details,
         };
         println!("{}", serde_json::to_string(&result).unwrap());
     }
 
-    let p = if total_tp + total_fp > 0 { total_tp as f64 / (total_tp + total_fp) as f64 } else { 0.0 };
-    let r = if total_tp + total_fn > 0 { total_tp as f64 / (total_tp + total_fn) as f64 } else { 0.0 };
+    let p = if total_tp + total_fp > 0 {
+        total_tp as f64 / (total_tp + total_fp) as f64
+    } else {
+        0.0
+    };
+    let r = if total_tp + total_fn > 0 {
+        total_tp as f64 / (total_tp + total_fn) as f64
+    } else {
+        0.0
+    };
     let a = if total_tp + total_tn + total_fp + total_fn > 0 {
         (total_tp + total_tn) as f64 / (total_tp + total_tn + total_fp + total_fn) as f64
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let f = if 2 * total_tp + total_fp + total_fn > 0 {
         (2 * total_tp) as f64 / (2 * total_tp + total_fp + total_fn) as f64
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     eprintln!("Rust trafilatura: precision={p:.3}  recall={r:.3}  accuracy={a:.3}  f-score={f:.3}  (evaluated={evaluated}, skipped={skipped})");
 }

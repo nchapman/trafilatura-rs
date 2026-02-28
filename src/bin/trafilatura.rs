@@ -4,7 +4,9 @@ use std::io::{self, Read, Write};
 
 use clap::{Parser, ValueEnum};
 use serde::Serialize;
-use trafilatura::{ExtractionFocus, ExtractResult, Metadata, Options, create_readable_document, extract};
+use trafilatura::{
+    create_readable_document, extract, ExtractResult, ExtractionFocus, Metadata, Options,
+};
 
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0";
@@ -110,9 +112,7 @@ fn main() {
     let opts = build_options(&cli);
 
     let result = match cli.source.as_deref() {
-        Some(src) if std::path::Path::new(src).exists() => {
-            process_file(src, opts)
-        }
+        Some(src) if std::path::Path::new(src).exists() => process_file(src, opts),
         Some(src) if is_valid_url(src) => {
             let url = url::Url::parse(src).expect("already validated");
             process_url(&cli, url, opts)
@@ -147,8 +147,8 @@ fn main() {
 // ---------------------------------------------------------------------------
 
 fn process_file(path: &str, opts: Options) -> Result<ExtractResult, String> {
-    let html = std::fs::read_to_string(path)
-        .map_err(|e| format!("cannot read '{}': {}", path, e))?;
+    let html =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read '{}': {}", path, e))?;
     extract(&html, opts).map_err(|e| e.to_string())
 }
 
@@ -264,8 +264,7 @@ fn write_text(w: &mut dyn Write, result: &ExtractResult) -> io::Result<()> {
 /// Port of writeJSON in output.go.
 fn write_json(w: &mut dyn Write, result: &ExtractResult) -> io::Result<()> {
     let output = JsonOutput::from(result);
-    serde_json::to_writer(&mut *w, &output)
-        .map_err(io::Error::other)?;
+    serde_json::to_writer(&mut *w, &output).map_err(io::Error::other)?;
     writeln!(w)
 }
 

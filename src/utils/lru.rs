@@ -52,7 +52,6 @@ impl LruCache {
         self.keys.push_back(key.clone());
         self.data.insert(key, value);
     }
-
 }
 
 #[cfg(test)]

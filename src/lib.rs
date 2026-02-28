@@ -361,7 +361,10 @@ mod tests {
              the minimum size threshold for extraction and should appear in the result.</p></article>",
         );
         let result = extract(&html, Options::default()).unwrap();
-        assert!(!result.content_text.is_empty(), "should extract content text");
+        assert!(
+            !result.content_text.is_empty(),
+            "should extract content text"
+        );
         assert!(
             result.content_text.contains("main content"),
             "content should contain article text"
@@ -377,8 +380,14 @@ mod tests {
              any issues from the minimum size requirements.</p></article>",
         );
         let result = extract(&html, Options::default()).unwrap();
-        assert!(!result.content_text.contains("Navigation"), "nav should be stripped");
-        assert!(!result.content_text.contains("alert"), "script should be stripped");
+        assert!(
+            !result.content_text.contains("Navigation"),
+            "nav should be stripped"
+        );
+        assert!(
+            !result.content_text.contains("alert"),
+            "script should be stripped"
+        );
     }
 
     #[test]
@@ -397,7 +406,10 @@ mod tests {
         let mut opts = Options::default();
         opts.exclude_comments = true;
         let result = extract(&html, opts).unwrap();
-        assert!(result.comments_text.is_empty(), "comments should be excluded");
+        assert!(
+            result.comments_text.is_empty(),
+            "comments should be excluded"
+        );
     }
 
     #[test]
@@ -451,7 +463,10 @@ mod tests {
              and produce a non-empty HTML output in the result struct.</p></article>",
         );
         let result = extract(&html, Options::default()).unwrap();
-        assert!(!result.content_html.is_empty(), "content_html should be populated");
+        assert!(
+            !result.content_html.is_empty(),
+            "content_html should be populated"
+        );
     }
 
     #[test]
@@ -575,8 +590,14 @@ mod tests {
         let html = create_readable_document(&result);
 
         // Should have proper HTML shell.
-        assert!(html.starts_with("<html><head>"), "should start with html/head");
-        assert!(html.ends_with("</body></html>"), "should end with /body/html");
+        assert!(
+            html.starts_with("<html><head>"),
+            "should start with html/head"
+        );
+        assert!(
+            html.ends_with("</body></html>"),
+            "should end with /body/html"
+        );
 
         // Meta tags.
         assert!(html.contains(r#"name="title" content="My Title""#));

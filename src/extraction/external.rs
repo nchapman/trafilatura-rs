@@ -17,9 +17,9 @@ use super::html_processing::{doc_cleaning, prune_unwanted_nodes};
 /// Port of `tagsToSanitize`.
 static TAGS_TO_SANITIZE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "aside", "audio", "button", "fieldset", "figure", "footer", "iframe",
-        "input", "label", "link", "nav", "noindex", "noscript",
-        "object", "option", "select", "source", "svg", "time",
+        "aside", "audio", "button", "fieldset", "figure", "footer", "iframe", "input", "label",
+        "link", "nav", "noindex", "noscript", "object", "option", "select", "source", "svg",
+        "time",
     ]
     .into_iter()
     .collect()
@@ -146,8 +146,7 @@ fn create_fallback_generators(cleaned_html: &str, opts: &Options) -> Vec<Fallbac
     // Built-in readability generator — parse via readability, get tree back directly.
     let html_owned = cleaned_html.to_string();
     generators.push(Box::new(move || {
-        generate_readability_candidate(&html_owned)
-            .map(|doc| ("Readability", doc))
+        generate_readability_candidate(&html_owned).map(|doc| ("Readability", doc))
     }));
 
     generators
@@ -217,8 +216,7 @@ pub(crate) fn candidate_is_usable(
             .sum();
 
         let candidate_big = len_candidate > opts.config.min_extracted_size * 2;
-        if candidate_big
-            && (p_text_len == 0 || extracted_tables.len() > extracted_paragraphs.len())
+        if candidate_big && (p_text_len == 0 || extracted_tables.len() > extracted_paragraphs.len())
         {
             true
         } else {
@@ -463,7 +461,10 @@ mod tests {
         let mut d = doc(html);
         sanitize_tree(&mut d, &default_opts());
         let root = d.root();
-        assert!(d.query_selector(root, "span").is_none(), "span should be stripped");
+        assert!(
+            d.query_selector(root, "span").is_none(),
+            "span should be stripped"
+        );
         // text should survive
         let body = d.body().unwrap();
         let text = d.text_content(body);
@@ -478,7 +479,10 @@ mod tests {
         opts.include_links = false;
         sanitize_tree(&mut d, &opts);
         let root = d.root();
-        assert!(d.query_selector(root, "a").is_none(), "<a> should be stripped");
+        assert!(
+            d.query_selector(root, "a").is_none(),
+            "<a> should be stripped"
+        );
         let body = d.body().unwrap();
         assert!(d.text_content(body).contains("this"), "link text survives");
     }
@@ -501,7 +505,10 @@ mod tests {
         sanitize_tree(&mut d, &default_opts());
         // custom-widget is not in VALID_TAG_CATALOG, its text should survive (stripped, not removed)
         let body = d.body().unwrap();
-        assert!(d.text_content(body).contains("stuff"), "text from unknown tag survives");
+        assert!(
+            d.text_content(body).contains("stuff"),
+            "text from unknown tag survives"
+        );
     }
 
     // ---- candidate_is_usable ----
@@ -586,8 +593,14 @@ mod tests {
         let opts = default_opts();
         let (result_doc, _) = compare_external_extraction(&original, extracted, &opts);
         let root = result_doc.root();
-        assert!(result_doc.query_selector(root, "aside").is_none(), "aside removed by sanitize");
-        assert!(result_doc.query_selector(root, "span").is_none(), "span stripped by sanitize");
+        assert!(
+            result_doc.query_selector(root, "aside").is_none(),
+            "aside removed by sanitize"
+        );
+        assert!(
+            result_doc.query_selector(root, "span").is_none(),
+            "span stripped by sanitize"
+        );
     }
 
     // ---- FallbackCandidates ----
@@ -644,7 +657,10 @@ mod tests {
         let extracted = doc("<html><body><p>Some content here</p></body></html>");
         let opts = default_opts();
         let (_, text) = compare_external_extraction(&original, extracted, &opts);
-        assert!(text.contains("Some content"), "extraction should survive when no candidates");
+        assert!(
+            text.contains("Some content"),
+            "extraction should survive when no candidates"
+        );
     }
 
     // ---- justext integration ----
@@ -662,7 +678,10 @@ mod tests {
         let body = result.body().unwrap();
         let text = result.text_content(body);
         // justext should classify substantive English paragraphs as good
-        assert!(!trim(&text).is_empty(), "try_justext should extract English content");
+        assert!(
+            !trim(&text).is_empty(),
+            "try_justext should extract English content"
+        );
     }
 
     #[test]
@@ -676,7 +695,10 @@ mod tests {
         let result = try_justext(html, &stoplist);
         let body = result.body().unwrap();
         let text = result.text_content(body);
-        assert!(!trim(&text).is_empty(), "should work with unknown language via all stoplists");
+        assert!(
+            !trim(&text).is_empty(),
+            "should work with unknown language via all stoplists"
+        );
     }
 
     #[test]
@@ -744,11 +766,17 @@ mod tests {
         let len_extracted = 500;
         let len_jt = 100;
         // len_extracted (500) > 4 * len_jt (400) => should NOT use justext
-        assert!(len_extracted > 4 * len_jt, "precondition: extracted is >4x justext");
+        assert!(
+            len_extracted > 4 * len_jt,
+            "precondition: extracted is >4x justext"
+        );
 
         let len_extracted2 = 399;
         let len_jt2 = 100;
         // len_extracted2 (399) <= 4 * len_jt2 (400) => true, SHOULD use justext
-        assert!(len_extracted2 <= 4 * len_jt2, "precondition: extracted is <=4x justext");
+        assert!(
+            len_extracted2 <= 4 * len_jt2,
+            "precondition: extracted is <=4x justext"
+        );
     }
 }

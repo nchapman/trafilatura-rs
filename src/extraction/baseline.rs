@@ -202,7 +202,10 @@ mod tests {
     fn test_baseline_blank_document() {
         let mut d = doc("");
         let (_, result) = baseline(&mut d);
-        assert!(result.is_empty(), "blank document should produce empty text");
+        assert!(
+            result.is_empty(),
+            "blank document should produce empty text"
+        );
     }
 
     #[test]
@@ -246,7 +249,10 @@ mod tests {
             </body></html>"#;
         let mut d = doc(html);
         let (_, result) = baseline(&mut d);
-        assert!(result.is_empty(), "invalid JSON should produce empty result");
+        assert!(
+            result.is_empty(),
+            "invalid JSON should produce empty result"
+        );
     }
 
     #[test]
@@ -310,7 +316,10 @@ mod tests {
             </body></html>"#;
         let mut d = doc(html);
         let (_, result) = baseline(&mut d);
-        assert!(result.contains("Nested body text"), "should find nested articleBody");
+        assert!(
+            result.contains("Nested body text"),
+            "should find nested articleBody"
+        );
     }
 
     #[test]
@@ -324,9 +333,18 @@ mod tests {
         let mut d = Document::parse(html);
         basic_cleaning(&mut d);
         let root = d.root();
-        assert!(d.query_selector(root, "footer").is_none(), "footer should be removed");
-        assert!(d.query_selector(root, "aside").is_none(), "aside should be removed");
-        assert!(d.query_selector(root, "script").is_none(), "script should be removed");
+        assert!(
+            d.query_selector(root, "footer").is_none(),
+            "footer should be removed"
+        );
+        assert!(
+            d.query_selector(root, "aside").is_none(),
+            "aside should be removed"
+        );
+        assert!(
+            d.query_selector(root, "script").is_none(),
+            "script should be removed"
+        );
         // Content paragraph should survive
         assert!(d.query_selector(root, "p").is_some(), "p should remain");
     }
@@ -339,7 +357,10 @@ mod tests {
         let (result_doc, _) = baseline(&mut d);
         let body = result_doc.body().expect("result has body");
         let paragraphs = result_doc.get_elements_by_tag_name(body, "p");
-        assert!(!paragraphs.is_empty(), "result doc should contain <p> elements");
+        assert!(
+            !paragraphs.is_empty(),
+            "result doc should contain <p> elements"
+        );
     }
 
     #[test]
@@ -354,7 +375,10 @@ mod tests {
             </body></html>"#;
         let mut d = doc(html);
         let (_, result) = baseline(&mut d);
-        assert!(result.contains("Array-rooted"), "should extract articleBody from array-rooted JSON-LD");
+        assert!(
+            result.contains("Array-rooted"),
+            "should extract articleBody from array-rooted JSON-LD"
+        );
     }
 
     #[test]

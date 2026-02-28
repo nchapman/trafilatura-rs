@@ -2,16 +2,16 @@
 
 use crate::dom::{Document, NodeId};
 use crate::options::{ExtractionFocus, Options};
+use crate::selector::query_all;
 use crate::selector::Rule;
 use crate::settings::{
-    ALLOWED_ATTRIBUTES, ELEMENT_WITH_SIZE_ATTR, EMPTY_TAGS_TO_REMOVE, TAGS_TO_CLEAN,
-    TAGS_TO_STRIP, XML_GRAPHIC_TAGS, XML_LB_TAGS, XML_QUOTE_TAGS,
+    ALLOWED_ATTRIBUTES, ELEMENT_WITH_SIZE_ATTR, EMPTY_TAGS_TO_REMOVE, TAGS_TO_CLEAN, TAGS_TO_STRIP,
+    XML_GRAPHIC_TAGS, XML_LB_TAGS, XML_QUOTE_TAGS,
 };
+use crate::utils::is_image_element;
 use crate::utils::lru::LruCache;
 use crate::utils::text::{duplicate_test, text_chars_test, text_filter};
 use crate::utils::trim;
-use crate::utils::is_image_element;
-use crate::selector::query_all;
 
 /// Cleans the document by discarding unwanted elements.
 ///
@@ -251,17 +251,23 @@ pub(crate) fn link_density_test(
         };
         let link_text = trim(&doc.text_content(links[0]));
         let link_text_length = link_text.chars().count();
-        if link_text_length > threshold
-            && link_text_length as f64 > text_length as f64 * 0.9
-        {
+        if link_text_length > threshold && link_text_length as f64 > text_length as f64 * 0.9 {
             return (Vec::new(), true);
         }
     }
 
     // Determine limit based on tag and sibling position.
     let limit_length: usize = if doc.tag_name(element) == "p" {
-        if doc.next_element_sibling(element).is_none() { 60 } else { 30 }
-    } else if doc.next_element_sibling(element).is_none() { 300 } else { 100 };
+        if doc.next_element_sibling(element).is_none() {
+            60
+        } else {
+            30
+        }
+    } else if doc.next_element_sibling(element).is_none() {
+        300
+    } else {
+        100
+    };
 
     if text_length < limit_length {
         let (link_length, n_short_links, non_empty_links) = collect_link_info(doc, &links);
@@ -270,20 +276,11 @@ pub(crate) fn link_density_test(
             return (non_empty_links, true);
         }
 
-        tracing::debug!(
-            "list link text/total: {}/{}",
-            link_length,
-            text_length
-        );
-        tracing::debug!(
-            "short elems/total: {}/{}",
-            n_short_links,
-            n_non_empty
-        );
+        tracing::debug!("list link text/total: {}/{}", link_length, text_length);
+        tracing::debug!("short elems/total: {}/{}", n_short_links, n_non_empty);
 
         if link_length as f64 > text_length as f64 * 0.8
-            || (n_non_empty > 1
-                && n_short_links as f64 / n_non_empty as f64 > 0.8)
+            || (n_non_empty > 1 && n_short_links as f64 / n_non_empty as f64 > 0.8)
         {
             return (non_empty_links, true);
         }
@@ -326,10 +323,7 @@ pub(crate) fn link_density_test_tables(doc: &Document, table: NodeId, _opts: &Op
 /// Returns `(total_link_length, n_short_links, non_empty_links)`.
 ///
 /// Port of `collectLinkInfo`.
-pub(crate) fn collect_link_info(
-    doc: &Document,
-    links: &[NodeId],
-) -> (usize, usize, Vec<NodeId>) {
+pub(crate) fn collect_link_info(doc: &Document, links: &[NodeId]) -> (usize, usize, Vec<NodeId>) {
     let mut link_length = 0usize;
     let mut n_short_links = 0usize;
     let mut non_empty_links = Vec::new();
@@ -428,9 +422,10 @@ pub(crate) fn post_cleaning(doc: &mut Document) {
             // be stripped — the arms below shadow the allowlist for those cases.
             let keep = match attr.as_str() {
                 // Always strip presentational/identification attrs.
-                "id" | "class" | "align" | "background" | "bgcolor" | "border"
-                | "cellpadding" | "cellspacing" | "frame" | "hspace" | "rules"
-                | "style" | "valign" | "vspace" => false,
+                "id" | "class" | "align" | "background" | "bgcolor" | "border" | "cellpadding"
+                | "cellspacing" | "frame" | "hspace" | "rules" | "style" | "valign" | "vspace" => {
+                    false
+                }
                 // Strip width/height from non-size elements.
                 "width" | "height" => allow_size,
                 // Keep only if in allowlist.
@@ -526,19 +521,15 @@ pub(crate) fn convert_tags(doc: &mut Document, opts: &Options) {
             doc.clear_attributes(id);
 
             if !href.is_empty() {
-                let abs_href = crate::utils::url::create_absolute_url(
-                    &href,
-                    opts.original_url.as_ref(),
-                );
+                let abs_href =
+                    crate::utils::url::create_absolute_url(&href, opts.original_url.as_ref());
                 doc.set_attribute(id, "href", &abs_href);
             }
             if !target.is_empty() {
                 // Note: Go source also resolves target as a URL; this mirrors upstream
                 // behavior even though `target` is typically a frame name, not a URL.
-                let abs_target = crate::utils::url::create_absolute_url(
-                    &target,
-                    opts.original_url.as_ref(),
-                );
+                let abs_target =
+                    crate::utils::url::create_absolute_url(&target, opts.original_url.as_ref());
                 doc.set_attribute(id, "target", &abs_target);
             }
         }
@@ -559,10 +550,7 @@ pub(crate) fn convert_tags(doc: &mut Document, opts: &Options) {
         }
 
         // Find hljs span elements.
-        let hljs_elems = doc.query_selector_all(
-            id,
-            r#"span[class*=" hljs"], span[class^="hljs"]"#,
-        );
+        let hljs_elems = doc.query_selector_all(id, r#"span[class*=" hljs"], span[class^="hljs"]"#);
         if !hljs_elems.is_empty() {
             code_flag = true;
             for &hljs_id in &hljs_elems {
@@ -614,7 +602,10 @@ mod tests {
 
     #[test]
     fn test_doc_cleaning_include_images_keeps_figure() {
-        let opts = Options { include_images: true, ..Options::default() };
+        let opts = Options {
+            include_images: true,
+            ..Options::default()
+        };
         let mut doc = parse(r#"<html><body><figure><img src="x.jpg"/></figure></body></html>"#);
         doc_cleaning(&mut doc, &opts);
         assert!(doc.query_selector(doc.root(), "figure").is_some());
@@ -622,8 +613,12 @@ mod tests {
 
     #[test]
     fn test_doc_cleaning_exclude_tables() {
-        let opts = Options { exclude_tables: true, ..Options::default() };
-        let mut doc = parse(r#"<html><body><table><tr><td>data</td></tr></table><p>text</p></body></html>"#);
+        let opts = Options {
+            exclude_tables: true,
+            ..Options::default()
+        };
+        let mut doc =
+            parse(r#"<html><body><table><tr><td>data</td></tr></table><p>text</p></body></html>"#);
         doc_cleaning(&mut doc, &opts);
         assert!(doc.query_selector(doc.root(), "table").is_none());
     }
@@ -663,7 +658,9 @@ mod tests {
     fn test_prune_unwanted_nodes_backup_restored_on_large_removal() {
         use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
         // All content is in a footer div → if removed, backup would be restored.
-        let doc = parse(r#"<html><body><div class="footer">a lot of text here that will be counted as content and removed by the discard rules because it has footer class</div></body></html>"#);
+        let doc = parse(
+            r#"<html><body><div class="footer">a lot of text here that will be counted as content and removed by the discard rules because it has footer class</div></body></html>"#,
+        );
         let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
         // Original should be restored since too much was removed.
         assert!(result.query_selector(result.root(), "div").is_some());
@@ -671,7 +668,8 @@ mod tests {
 
     #[test]
     fn test_post_cleaning_strips_disallowed_attrs() {
-        let mut doc = parse(r#"<html><body><p class="foo" style="color:red">text</p></body></html>"#);
+        let mut doc =
+            parse(r#"<html><body><p class="foo" style="color:red">text</p></body></html>"#);
         post_cleaning(&mut doc);
         let p = doc.query_selector(doc.root(), "p").unwrap();
         assert!(doc.get_attribute(p, "class").is_none());
@@ -697,7 +695,9 @@ mod tests {
 
     #[test]
     fn test_link_density_test_normal() {
-        let doc = parse(r#"<html><body><p>This is a long paragraph with some text and <a href="x">one link</a> that is not dominant.</p></body></html>"#);
+        let doc = parse(
+            r#"<html><body><p>This is a long paragraph with some text and <a href="x">one link</a> that is not dominant.</p></body></html>"#,
+        );
         let body = doc.body().unwrap();
         let p = doc.query_selector(body, "p").unwrap();
         let (_, is_dense) = link_density_test(&doc, p, &Options::default());
@@ -708,7 +708,10 @@ mod tests {
     fn test_convert_tags_strips_links_when_not_included() {
         // Links inside p/div/ul/ol/dl are preserved (renamed to protected-a, then back).
         // Standalone links (outside those containers) are stripped.
-        let opts = Options { include_links: false, ..Options::default() };
+        let opts = Options {
+            include_links: false,
+            ..Options::default()
+        };
         let mut doc = parse(
             r#"<html><body><p><a href="x">inline</a></p><a href="nav">nav</a></body></html>"#,
         );
@@ -716,7 +719,10 @@ mod tests {
         let body = doc.body().unwrap();
         // Inline link inside <p> is kept as <a>.
         let p = doc.query_selector(body, "p").unwrap();
-        assert!(doc.query_selector(p, "a").is_some(), "<a> inside <p> should be preserved");
+        assert!(
+            doc.query_selector(p, "a").is_some(),
+            "<a> inside <p> should be preserved"
+        );
         // Both text contents survive.
         let text = doc.text_content(body);
         assert!(text.contains("inline"));
@@ -744,7 +750,8 @@ mod tests {
     fn test_prune_no_backup_removes_all_matching_even_if_drastic() {
         use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
         // with_backup=false: even if 100% of text is removed, no restore happens.
-        let doc = parse(r#"<html><body><div class="footer">all the text lives here</div></body></html>"#);
+        let doc =
+            parse(r#"<html><body><div class="footer">all the text lives here</div></body></html>"#);
         let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, false);
         // Footer is gone and no restore occurred — body is empty.
         assert!(result.query_selector(result.root(), "div").is_none());
@@ -755,15 +762,23 @@ mod tests {
         use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
         // Most text is NOT in the footer: after pruning, more than 1/7 of original
         // text remains, so the backup must NOT be restored.
-        let doc = parse(r#"<html><body>
+        let doc = parse(
+            r#"<html><body>
             <p>This is a long article body with plenty of text content here.</p>
             <p>Another paragraph with substantial content to ensure we stay well above the threshold.</p>
             <div class="footer">footer</div>
-        </body></html>"#);
+        </body></html>"#,
+        );
         let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
         // Footer removed, paragraphs remain — backup was NOT restored.
-        assert!(result.query_selector(result.root(), "div").is_none(), "footer must be pruned");
-        assert!(result.query_selector(result.root(), "p").is_some(), "paragraphs must survive");
+        assert!(
+            result.query_selector(result.root(), "div").is_none(),
+            "footer must be pruned"
+        );
+        assert!(
+            result.query_selector(result.root(), "p").is_some(),
+            "paragraphs must survive"
+        );
     }
 
     #[test]
@@ -772,9 +787,11 @@ mod tests {
         // ALL meaningful text is in a "nav" div — removing it drops everything,
         // triggering restore. The restored document must be structurally identical
         // to the input (same elements present).
-        let doc = parse(r#"<html><body>
+        let doc = parse(
+            r#"<html><body>
             <div class="nav">nav text one two three four five six seven eight nine ten eleven</div>
-        </body></html>"#);
+        </body></html>"#,
+        );
         let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
         // Because more than 6/7 of the text was removed, restore should have happened.
         // The nav div should be back.
@@ -791,15 +808,21 @@ mod tests {
         // Strategy: if backup were captured after partial modification, the restored
         // document would be missing some elements. We check that ALL original
         // elements are present after restore.
-        let doc = parse(r#"<html><body>
+        let doc = parse(
+            r#"<html><body>
             <div class="nav">nav-only-content one two three four five six seven</div>
             <div class="footer">footer-only-content</div>
-        </body></html>"#);
+        </body></html>"#,
+        );
         let result = prune_unwanted_nodes(&doc, OVERALL_DISCARDED_CONTENT, true);
         let body = result.body().unwrap();
         let divs = result.get_elements_by_tag_name(body, "div");
         // Both divs should be restored (backup was taken before ANY removal).
-        assert_eq!(divs.len(), 2, "backup must contain both divs from original document");
+        assert_eq!(
+            divs.len(),
+            2,
+            "backup must contain both divs from original document"
+        );
     }
 
     #[test]
@@ -811,5 +834,4 @@ mod tests {
         let doc_with_backup = parse("<html><body></body></html>");
         let _ = prune_unwanted_nodes(&doc_with_backup, OVERALL_DISCARDED_CONTENT, true);
     }
-
 }

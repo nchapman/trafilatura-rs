@@ -57,8 +57,7 @@ struct Performance {
 // ---------------------------------------------------------------------------
 
 fn load_entries() -> Vec<ComparisonEntry> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("comparison-data/entries.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("comparison-data/entries.json");
     let json = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("Failed to read comparison-data/entries.json: {e}"));
     serde_json::from_str(&json)
@@ -87,13 +86,11 @@ fn load_html(file: &str) -> Option<String> {
                 let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);
                 return Some(decoded.into_owned());
             }
-            return String::from_utf8(bytes)
-                .ok()
-                .or_else(|| {
-                    std::fs::read(path.clone()).ok().map(|b| {
-                        String::from_utf8_lossy(&b).into_owned()
-                    })
-                });
+            return String::from_utf8(bytes).ok().or_else(|| {
+                std::fs::read(path.clone())
+                    .ok()
+                    .map(|b| String::from_utf8_lossy(&b).into_owned())
+            });
         }
     }
     None
@@ -127,7 +124,12 @@ fn evaluate_entry(entry: &ComparisonEntry, result: &str) -> EvaluationResult {
     ev
 }
 
-fn calculate_performance(title: &str, ev: EvaluationResult, evaluated: usize, skipped: usize) -> Performance {
+fn calculate_performance(
+    title: &str,
+    ev: EvaluationResult,
+    evaluated: usize,
+    skipped: usize,
+) -> Performance {
     let tp = ev.true_positives as f64;
     let fn_ = ev.false_negatives as f64;
     let fp = ev.false_positives as f64;
@@ -135,10 +137,26 @@ fn calculate_performance(title: &str, ev: EvaluationResult, evaluated: usize, sk
 
     let precision = if tp + fp > 0.0 { tp / (tp + fp) } else { 0.0 };
     let recall = if tp + fn_ > 0.0 { tp / (tp + fn_) } else { 0.0 };
-    let accuracy = if tp + tn + fp + fn_ > 0.0 { (tp + tn) / (tp + tn + fp + fn_) } else { 0.0 };
-    let fscore = if 2.0 * tp + fp + fn_ > 0.0 { (2.0 * tp) / (2.0 * tp + fp + fn_) } else { 0.0 };
+    let accuracy = if tp + tn + fp + fn_ > 0.0 {
+        (tp + tn) / (tp + tn + fp + fn_)
+    } else {
+        0.0
+    };
+    let fscore = if 2.0 * tp + fp + fn_ > 0.0 {
+        (2.0 * tp) / (2.0 * tp + fp + fn_)
+    } else {
+        0.0
+    };
 
-    Performance { title: title.to_string(), evaluated, skipped, precision, recall, accuracy, fscore }
+    Performance {
+        title: title.to_string(),
+        evaluated,
+        skipped,
+        precision,
+        recall,
+        accuracy,
+        fscore,
+    }
 }
 
 fn run_comparison(title: &str, enable_fallback: bool, focus: ExtractionFocus) -> Performance {
@@ -150,7 +168,10 @@ fn run_comparison(title: &str, enable_fallback: bool, focus: ExtractionFocus) ->
     for entry in &entries {
         let html = match load_html(&entry.file) {
             Some(h) => h,
-            None => { skipped += 1; continue; }
+            None => {
+                skipped += 1;
+                continue;
+            }
         };
 
         let url = url::Url::parse(&entry.url).ok();
@@ -210,22 +231,40 @@ fn comparison_all_modes() {
     print_performance(&favor_recall);
 
     // Balanced + Fallback — primary mode, tightest thresholds.
-    assert!(balanced.precision >= 0.89, "balanced precision {:.3} below 0.89", balanced.precision);
-    assert!(balanced.recall >= 0.87, "balanced recall {:.3} below 0.87", balanced.recall);
-    assert!(balanced.accuracy >= 0.88, "balanced accuracy {:.3} below 0.88", balanced.accuracy);
-    assert!(balanced.fscore >= 0.88, "balanced f-score {:.3} below 0.88", balanced.fscore);
+    assert!(
+        balanced.precision >= 0.89,
+        "balanced precision {:.3} below 0.89",
+        balanced.precision
+    );
+    assert!(
+        balanced.recall >= 0.87,
+        "balanced recall {:.3} below 0.87",
+        balanced.recall
+    );
+    assert!(
+        balanced.accuracy >= 0.88,
+        "balanced accuracy {:.3} below 0.88",
+        balanced.accuracy
+    );
+    assert!(
+        balanced.fscore >= 0.88,
+        "balanced f-score {:.3} below 0.88",
+        balanced.fscore
+    );
 
     // FavorPrecision should have higher (or equal) precision than balanced.
     assert!(
         favor_precision.precision >= balanced.precision - 0.01,
         "FavorPrecision ({:.3}) should not be worse than Balanced ({:.3})",
-        favor_precision.precision, balanced.precision,
+        favor_precision.precision,
+        balanced.precision,
     );
 
     // FavorRecall should have higher (or equal) recall than balanced.
     assert!(
         favor_recall.recall >= balanced.recall - 0.01,
         "FavorRecall ({:.3}) should not be worse than Balanced ({:.3})",
-        favor_recall.recall, balanced.recall,
+        favor_recall.recall,
+        balanced.recall,
     );
 }

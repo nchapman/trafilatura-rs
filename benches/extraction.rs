@@ -18,13 +18,14 @@ use trafilatura::options::{ExtractionFocus, Options};
 // ---------------------------------------------------------------------------
 
 fn test_files_dir() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("test-files").leak()
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("test-files")
+        .leak()
 }
 
 fn load_mock(filename: &str) -> String {
     let path = test_files_dir().join("mock").join(filename);
-    std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Failed to read {filename}: {e}"))
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {filename}: {e}"))
 }
 
 fn load_comparison_html(filename: &str) -> Option<String> {
@@ -43,8 +44,7 @@ struct ComparisonEntry {
 }
 
 fn load_corpus() -> Vec<String> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("comparison-data/entries.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("comparison-data/entries.json");
     let json = std::fs::read_to_string(path).expect("comparison-data/entries.json not found");
     let entries: Vec<ComparisonEntry> =
         serde_json::from_str(&json).expect("failed to parse entries.json");
@@ -68,8 +68,8 @@ fn default_opts() -> Options {
 fn bench_single_document(c: &mut Criterion) {
     // Representative pages from the mock set, spanning the size spectrum.
     let pages: &[(&str, &str)] = &[
-        ("small  (6KB)",   "die-partei.net.luebeck.html"),
-        ("medium (85KB)",  "zeit.de.zugverkehr.html"),
+        ("small  (6KB)", "die-partei.net.luebeck.html"),
+        ("medium (85KB)", "zeit.de.zugverkehr.html"),
         ("large  (382KB)", "reuters.com.parasite.html"),
         ("xlarge (906KB)", "pcgamer.com.skyrim.html"),
     ];
@@ -80,13 +80,9 @@ fn bench_single_document(c: &mut Criterion) {
         let html = load_mock(filename);
         let bytes = html.len() as u64;
         group.throughput(Throughput::Bytes(bytes));
-        group.bench_with_input(
-            BenchmarkId::new("extract", label),
-            &html,
-            |b, html| {
-                b.iter(|| trafilatura::extract(html, default_opts()))
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("extract", label), &html, |b, html| {
+            b.iter(|| trafilatura::extract(html, default_opts()))
+        });
     }
 
     group.finish();
@@ -129,9 +125,9 @@ fn bench_modes(c: &mut Criterion) {
 
     let modes: &[(&str, bool, ExtractionFocus)] = &[
         ("balanced_no_fallback", false, ExtractionFocus::Balanced),
-        ("balanced_fallback",    true,  ExtractionFocus::Balanced),
-        ("favor_precision",      true,  ExtractionFocus::FavorPrecision),
-        ("favor_recall",         true,  ExtractionFocus::FavorRecall),
+        ("balanced_fallback", true, ExtractionFocus::Balanced),
+        ("favor_precision", true, ExtractionFocus::FavorPrecision),
+        ("favor_recall", true, ExtractionFocus::FavorRecall),
     ];
 
     let mut group = c.benchmark_group("modes");
@@ -142,11 +138,9 @@ fn bench_modes(c: &mut Criterion) {
             .with_fallback(enable_fallback)
             .with_focus(focus)
             .with_exclude_comments(true);
-        group.bench_with_input(
-            BenchmarkId::new("extract", label),
-            &html,
-            |b, html| b.iter(|| trafilatura::extract(html, opts.clone())),
-        );
+        group.bench_with_input(BenchmarkId::new("extract", label), &html, |b, html| {
+            b.iter(|| trafilatura::extract(html, opts.clone()))
+        });
     }
 
     group.finish();
@@ -156,10 +150,5 @@ fn bench_modes(c: &mut Criterion) {
 // Registration
 // ---------------------------------------------------------------------------
 
-criterion_group!(
-    benches,
-    bench_single_document,
-    bench_corpus,
-    bench_modes,
-);
+criterion_group!(benches, bench_single_document, bench_corpus, bench_modes,);
 criterion_main!(benches);

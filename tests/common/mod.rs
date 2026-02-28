@@ -14,11 +14,16 @@ use trafilatura::result::ExtractResult;
 fn detect_charset(bytes: &[u8]) -> Option<&'static str> {
     let prefix = &bytes[..bytes.len().min(4096)];
     // Map bytes to ASCII lowercase for comparison, treating non-ASCII bytes as 0.
-    let lower: Vec<u8> = prefix.iter().map(|&b| if b < 128 { b.to_ascii_lowercase() } else { 0 }).collect();
+    let lower: Vec<u8> = prefix
+        .iter()
+        .map(|&b| if b < 128 { b.to_ascii_lowercase() } else { 0 })
+        .collect();
     let lower_str = std::str::from_utf8(&lower).unwrap_or("");
     if lower_str.contains("charset=iso-8859") || lower_str.contains("charset=\"iso-8859") {
         Some("iso-8859-1")
-    } else if lower_str.contains("charset=windows-1252") || lower_str.contains("charset=\"windows-1252") {
+    } else if lower_str.contains("charset=windows-1252")
+        || lower_str.contains("charset=\"windows-1252")
+    {
         Some("windows-1252")
     } else {
         None
@@ -41,8 +46,8 @@ pub fn load_mock_html(url: &str) -> String {
         .join("test-files/mock")
         .join(&filename);
     // Read as bytes first to handle non-UTF-8 encodings (e.g. ISO-8859-1).
-    let bytes = std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("Failed to read mock file {filename}: {e}"));
+    let bytes =
+        std::fs::read(&path).unwrap_or_else(|e| panic!("Failed to read mock file {filename}: {e}"));
 
     // Try to detect and convert non-UTF-8 charsets before parsing.
     if detect_charset(&bytes).is_some() {
@@ -51,8 +56,7 @@ pub fn load_mock_html(url: &str) -> String {
         return decoded.into_owned();
     }
 
-    String::from_utf8(bytes)
-        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+    String::from_utf8(bytes).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
 }
 
 /// Extract content from a mock file, optionally including links.
@@ -133,7 +137,10 @@ pub fn mock_file_map() -> HashMap<&'static str, &'static str> {
         "http://www.shingon-reiki.de/reiki-und-schamanismus/",
         "shingon-reiki.de.schamanismus.html",
     );
-    m.insert("http://love-hina.ch/news/0409.html", "love-hina.ch.0409.html");
+    m.insert(
+        "http://love-hina.ch/news/0409.html",
+        "love-hina.ch.0409.html",
+    );
     m.insert(
         "http://www.cdu-fraktion-erfurt.de/inhalte/aktuelles/entwicklung-der-waldorfschule-ermoeglicht/index.html",
         "cdu-fraktion-erfurt.de.waldorfschule.html",

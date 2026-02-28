@@ -45,7 +45,11 @@ pub(crate) fn handle_titles(
     if orig_tag == "summary" {
         doc.set_tag_name(id, "b");
     }
-    let result_tag = if orig_tag == "summary" { "b" } else { orig_tag.as_str() };
+    let result_tag = if orig_tag == "summary" {
+        "b"
+    } else {
+        orig_tag.as_str()
+    };
 
     let children = doc.children(id);
 
@@ -230,7 +234,9 @@ fn handle_lists_inner(
     opts: &Options,
     depth: usize,
 ) -> Option<String> {
-    if depth >= MAX_LIST_DEPTH { return None; }
+    if depth >= MAX_LIST_DEPTH {
+        return None;
+    }
     let tag = doc.tag_name(id).to_string();
     let mut items: Vec<String> = Vec::new();
 
@@ -576,7 +582,11 @@ pub(crate) fn handle_paragraphs(
         // Mirror Go's `etree.SetTail(processedElement, etree.Tail(element))`:
         // include element's tail so sibling text (e.g. after a nested <p>) is preserved.
         let tail = trim(&doc.tail(id));
-        let tail_part = if !tail.is_empty() { format!(" {tail}") } else { String::new() };
+        let tail_part = if !tail.is_empty() {
+            format!(" {tail}")
+        } else {
+            String::new()
+        };
         return Some(format!("<p>{text}</p>{tail_part}"));
     }
 
@@ -794,7 +804,11 @@ fn build_cell_content(
         } else {
             tail
         };
-        return if content.is_empty() { None } else { Some(content) };
+        return if content.is_empty() {
+            None
+        } else {
+            Some(content)
+        };
     }
 
     // Cell has children: iterate and build content.
@@ -809,34 +823,35 @@ fn build_cell_content(
         }
         let child_tag = doc.tag_name(child_id).to_string();
 
-        let sub_html =
-            if XML_CELL_TAGS.contains(child_tag.as_str()) || XML_HI_TAGS.contains(child_tag.as_str()) {
-                let processed = handle_text_node(doc, child_id, cache, true, false, opts);
-                if processed.is_some() {
-                    let text = trim(&doc.text(child_id));
-                    let tail = trim(&doc.tail(child_id));
-                    let t = &child_tag;
-                    if !text.is_empty() {
-                        Some(if !tail.is_empty() {
-                            format!("<{t}>{text}</{t}> {tail}")
-                        } else {
-                            format!("<{t}>{text}</{t}>")
-                        })
-                    } else if !tail.is_empty() {
-                        Some(tail)
+        let sub_html = if XML_CELL_TAGS.contains(child_tag.as_str())
+            || XML_HI_TAGS.contains(child_tag.as_str())
+        {
+            let processed = handle_text_node(doc, child_id, cache, true, false, opts);
+            if processed.is_some() {
+                let text = trim(&doc.text(child_id));
+                let tail = trim(&doc.tail(child_id));
+                let t = &child_tag;
+                if !text.is_empty() {
+                    Some(if !tail.is_empty() {
+                        format!("<{t}>{text}</{t}> {tail}")
                     } else {
-                        None
-                    }
+                        format!("<{t}>{text}</{t}>")
+                    })
+                } else if !tail.is_empty() {
+                    Some(tail)
                 } else {
                     None
                 }
-            } else if XML_LIST_TAGS.contains(child_tag.as_str())
-                && opts.focus == ExtractionFocus::FavorRecall
-            {
-                handle_lists(doc, child_id, cache, opts)
             } else {
-                handle_text_elem(doc, child_id, potential_tags, cache, opts)
-            };
+                None
+            }
+        } else if XML_LIST_TAGS.contains(child_tag.as_str())
+            && opts.focus == ExtractionFocus::FavorRecall
+        {
+            handle_lists(doc, child_id, cache, opts)
+        } else {
+            handle_text_elem(doc, child_id, potential_tags, cache, opts)
+        };
 
         if let Some(html) = sub_html {
             cell_inner.push_str(&html);
@@ -958,7 +973,10 @@ mod tests {
         let opts = Options::default();
         let mut cache = make_cache();
         let html = handle_titles(&mut doc, id, &mut cache, &opts).expect("expected Some");
-        assert!(html.starts_with("<b>"), "summary should become <b>, got: {html}");
+        assert!(
+            html.starts_with("<b>"),
+            "summary should become <b>, got: {html}"
+        );
     }
 
     #[test]
@@ -1063,7 +1081,10 @@ mod tests {
             .expect("expected Some");
         // href preserved, class attribute stripped
         assert!(html.contains(r#"href="http://example.com""#), "got: {html}");
-        assert!(!html.contains("class="), "class should be stripped, got: {html}");
+        assert!(
+            !html.contains("class="),
+            "class should be stripped, got: {html}"
+        );
     }
 
     // ---------------------------------------------------------------------------
@@ -1137,14 +1158,16 @@ mod tests {
     #[test]
     fn test_handle_code_blocks_strips_attrs_preserves_structure() {
         // Go preserves nested element structure but strips attributes.
-        let (mut doc, id) =
-            parse_elem(r#"<pre><span class="kw">if</span> x == 1 {}</pre>"#);
+        let (mut doc, id) = parse_elem(r#"<pre><span class="kw">if</span> x == 1 {}</pre>"#);
         let html = handle_code_blocks(&mut doc, id).expect("expected Some");
         assert!(html.starts_with("<code>"), "got: {html}");
         // Nested <span> structure should be preserved.
         assert!(html.contains("<span>"), "span structure lost: {html}");
         // But class attribute should be stripped.
-        assert!(!html.contains("class="), "class attr should be stripped: {html}");
+        assert!(
+            !html.contains("class="),
+            "class attr should be stripped: {html}"
+        );
         assert!(html.contains("if"), "text content lost: {html}");
     }
 
@@ -1165,7 +1188,10 @@ mod tests {
         let opts = Options::default();
         let mut cache = make_cache();
         let html = handle_formatting(&mut doc, id, &mut cache, &opts).expect("expected Some");
-        assert!(html.starts_with("<p>"), "should be wrapped in <p>, got: {html}");
+        assert!(
+            html.starts_with("<p>"),
+            "should be wrapped in <p>, got: {html}"
+        );
         assert!(html.contains("<b>"), "got: {html}");
     }
 
@@ -1175,9 +1201,7 @@ mod tests {
 
     #[test]
     fn test_handle_lists_nested() {
-        let (mut doc, id) = parse_elem(
-            "<ul><li>Item <ul><li>Sub-item</li></ul></li></ul>",
-        );
+        let (mut doc, id) = parse_elem("<ul><li>Item <ul><li>Sub-item</li></ul></li></ul>");
         let opts = Options::default();
         let mut cache = make_cache();
         let html = handle_lists(&mut doc, id, &mut cache, &opts).expect("expected Some");
@@ -1197,8 +1221,8 @@ mod tests {
         let opts = Options::default();
         let mut cache = make_cache();
         let potential_tags: HashSet<&str> = crate::settings::TAG_CATALOG.iter().copied().collect();
-        let html = handle_table(&mut doc, id, &potential_tags, &mut cache, &opts)
-            .expect("expected Some");
+        let html =
+            handle_table(&mut doc, id, &potential_tags, &mut cache, &opts).expect("expected Some");
         assert!(html.starts_with("<table>"), "got: {html}");
         assert!(html.contains("Cell A"), "got: {html}");
         assert!(html.contains("Cell B"), "got: {html}");

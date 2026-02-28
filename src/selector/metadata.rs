@@ -7,7 +7,8 @@ use crate::selector::utils::{contains, get_node_ancestors, lower, starts_with};
 /// Rules to find author metadata elements.
 ///
 /// Port of `MetaAuthor`.
-pub(crate) const META_AUTHOR: &[super::Rule] = &[meta_author_rule1, meta_author_rule2, meta_author_rule3];
+pub(crate) const META_AUTHOR: &[super::Rule] =
+    &[meta_author_rule1, meta_author_rule2, meta_author_rule3];
 
 /// Rules to discard false-positive author matches.
 ///
@@ -18,7 +19,8 @@ pub(crate) const META_AUTHOR_DISCARD: &[super::Rule] =
 /// Rules to find title metadata elements.
 ///
 /// Port of `MetaTitle`.
-pub(crate) const META_TITLE: &[super::Rule] = &[meta_title_rule1, meta_title_rule2, meta_title_rule3];
+pub(crate) const META_TITLE: &[super::Rule] =
+    &[meta_title_rule1, meta_title_rule2, meta_title_rule3];
 
 /// Rules to find category metadata links.
 ///
@@ -438,10 +440,7 @@ fn meta_tags_rule4(doc: &Document, id: NodeId) -> bool {
     let mut cur = id;
     while let Some(parent) = doc.parent(cur) {
         let class = doc.class_name(parent);
-        if class == "entry-meta"
-            || contains(&class, "topics")
-            || contains(&class, "tags-links")
-        {
+        if class == "entry-meta" || contains(&class, "topics") || contains(&class, "tags-links") {
             return true;
         }
         cur = parent;
@@ -511,28 +510,36 @@ mod tests {
 
     #[test]
     fn test_meta_categories_rule1_post_meta_ancestor() {
-        let doc = parse(r#"<html><body><div class="post-meta"><a href="/cat/news">News</a></div></body></html>"#);
+        let doc = parse(
+            r#"<html><body><div class="post-meta"><a href="/cat/news">News</a></div></body></html>"#,
+        );
         let body = doc.body().unwrap();
         assert!(query(&doc, body, META_CATEGORIES).is_some());
     }
 
     #[test]
     fn test_meta_categories_rule4_cat_links() {
-        let doc = parse(r#"<html><body><li class="cat-links"><a href="/category/tech">Tech</a></li></body></html>"#);
+        let doc = parse(
+            r#"<html><body><li class="cat-links"><a href="/category/tech">Tech</a></li></body></html>"#,
+        );
         let body = doc.body().unwrap();
         assert!(query(&doc, body, META_CATEGORIES).is_some());
     }
 
     #[test]
     fn test_meta_tags_rule1_tags_div() {
-        let doc = parse(r#"<html><body><div class="tags"><a href="/tag/rust">Rust</a></div></body></html>"#);
+        let doc = parse(
+            r#"<html><body><div class="tags"><a href="/tag/rust">Rust</a></div></body></html>"#,
+        );
         let body = doc.body().unwrap();
         assert!(query(&doc, body, META_TAGS).is_some());
     }
 
     #[test]
     fn test_meta_tags_rule4_entry_meta() {
-        let doc = parse(r#"<html><body><div class="entry-meta"><a href="/tag/web">Web</a></div></body></html>"#);
+        let doc = parse(
+            r#"<html><body><div class="entry-meta"><a href="/tag/web">Web</a></div></body></html>"#,
+        );
         let body = doc.body().unwrap();
         assert!(query(&doc, body, META_TAGS).is_some());
     }
@@ -556,7 +563,8 @@ mod tests {
     #[test]
     fn test_meta_categories_rule1_wrong_ancestor_class() {
         // Correct tag ancestor but wrong class should not match.
-        let doc = parse(r#"<html><body><div class="sidebar"><a href="/cat">Cat</a></div></body></html>"#);
+        let doc =
+            parse(r#"<html><body><div class="sidebar"><a href="/cat">Cat</a></div></body></html>"#);
         let body = doc.body().unwrap();
         assert!(query(&doc, body, META_CATEGORIES).is_none());
     }
@@ -572,7 +580,9 @@ mod tests {
     #[test]
     fn test_meta_tags_rule1_wrong_ancestor_class() {
         // tags-like ancestor but wrong class should not trigger rule1.
-        let doc = parse(r#"<html><body><div class="sidebar"><a href="/tag/rust">Rust</a></div></body></html>"#);
+        let doc = parse(
+            r#"<html><body><div class="sidebar"><a href="/tag/rust">Rust</a></div></body></html>"#,
+        );
         let body = doc.body().unwrap();
         // rule3 would match "meta" but "sidebar" doesn't match tag/postmeta/meta either,
         // and there is no entry-meta/topics/tags-links ancestor for rule4.

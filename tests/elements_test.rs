@@ -28,7 +28,9 @@ fn in_article(html: &str) -> String {
 /// Port of the "Simple table" case in Test_TableProcessing.
 #[test]
 fn test_table_simple() {
-    let html = in_article("<table><tr><td>cell1</td><td>cell2</td></tr><tr><td>cell3</td><td>cell4</td></tr></table>");
+    let html = in_article(
+        "<table><tr><td>cell1</td><td>cell2</td></tr><tr><td>cell3</td><td>cell4</td></tr></table>",
+    );
     let result = extract(&html, zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("cell1"),
@@ -53,9 +55,7 @@ fn test_table_simple() {
 /// Port of "If a cell contains 'exotic' tags…" in Test_TableProcessing.
 #[test]
 fn test_table_cell_with_p_children() {
-    let html = in_article(
-        "<table><tr><td><p>text</p><p>more text</p></td></tr></table>",
-    );
+    let html = in_article("<table><tr><td><p>text</p><p>more text</p></td></tr></table>");
     let result = extract(&html, zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_html.contains("<p>text</p>"),
@@ -111,9 +111,7 @@ fn test_table_complex_with_links() {
 /// Port of "Table cell with text and child" in Test_TableProcessing.
 #[test]
 fn test_table_cell_text_and_child() {
-    let html = in_article(
-        "<table><tr><td>text<p>more text</p></td></tr></table>",
-    );
+    let html = in_article("<table><tr><td>text<p>more text</p></td></tr></table>");
     let result = extract(&html, zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("text"),
@@ -188,9 +186,7 @@ fn test_table_with_th_headers() {
 /// cells differs from Go's clone-based approach. We assert the text is present.
 #[test]
 fn test_table_cell_with_mark_formatting() {
-    let html = in_article(
-        "<table><tr><td><mark>highlighted text</mark></td></tr></table>",
-    );
+    let html = in_article("<table><tr><td><mark>highlighted text</mark></td></tr></table>");
     let result = extract(&html, zero_opts()).expect("extraction should succeed");
     assert!(
         result.content_text.contains("highlighted text"),
@@ -204,9 +200,7 @@ fn test_table_cell_with_mark_formatting() {
 /// Port of "Table cell with span" in Test_TableProcessing.
 #[test]
 fn test_table_cell_with_span_dropped() {
-    let html = in_article(
-        "<table><tr><td><span style='sth'>span text</span></td></tr></table>",
-    );
+    let html = in_article("<table><tr><td><span style='sth'>span text</span></td></tr></table>");
     let result = extract(&html, zero_opts()).expect("extraction should succeed");
     // The span should be dropped; the cell may appear as an empty <p>
     assert!(
@@ -370,11 +364,11 @@ fn test_list_malformed() {
         </ul>",
     );
     let result = extract(&html, zero_opts()).expect("extraction should succeed");
-    let count = result
-        .content_text
-        .matches("List item")
-        .count();
-    assert_eq!(count, 3, "should have 3 'List item' occurrences, got {count}");
+    let count = result.content_text.matches("List item").count();
+    assert_eq!(
+        count, 3,
+        "should have 3 'List item' occurrences, got {count}"
+    );
     assert!(
         result.content_text.contains("Description"),
         "content_text should contain 'Description'"
@@ -520,7 +514,9 @@ fn test_code_highlight_js() {
     );
     let result = extract(html, zero_opts()).expect("extraction should succeed");
     assert!(
-        result.content_html.contains(r"<code>code\nhighlighted more code</code>"),
+        result
+            .content_html
+            .contains(r"<code>code\nhighlighted more code</code>"),
         "content_html should contain collapsed code text, got: {}",
         result.content_html
     );
@@ -546,7 +542,9 @@ fn test_code_github_pip_install() {
     );
     let result = extract(html, zero_opts()).expect("extraction should succeed");
     assert!(
-        result.content_html.contains("<code>$ pip install PyGithub</code>"),
+        result
+            .content_html
+            .contains("<code>$ pip install PyGithub</code>"),
         "content_html should contain pip install code, got: {}",
         result.content_html
     );

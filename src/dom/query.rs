@@ -25,7 +25,9 @@ impl Document {
     ///
     /// Port of `dom.QuerySelectorAll`.
     pub fn query_selector_all(&self, root: NodeId, selector: &str) -> Vec<NodeId> {
-        let Ok(sel) = Selector::parse(selector) else { return Vec::new() };
+        let Ok(sel) = Selector::parse(selector) else {
+            return Vec::new();
+        };
         self.query_selector_all_compiled(root, &sel)
     }
 
@@ -43,7 +45,9 @@ impl Document {
     }
 
     fn find_first_matching(&self, id: NodeId, sel: &Selector, depth: usize) -> Option<NodeId> {
-        if depth >= MAX_TREE_DEPTH { return None; }
+        if depth >= MAX_TREE_DEPTH {
+            return None;
+        }
         let node_ref = self.tree.get(id)?;
         if let Some(elem_ref) = scraper::ElementRef::wrap(node_ref) {
             if sel.matches(&elem_ref) {
@@ -59,8 +63,12 @@ impl Document {
     }
 
     fn collect_matching(&self, id: NodeId, sel: &Selector, out: &mut Vec<NodeId>, depth: usize) {
-        if depth >= MAX_TREE_DEPTH { return; }
-        let Some(node_ref) = self.tree.get(id) else { return };
+        if depth >= MAX_TREE_DEPTH {
+            return;
+        }
+        let Some(node_ref) = self.tree.get(id) else {
+            return;
+        };
         if let Some(elem_ref) = scraper::ElementRef::wrap(node_ref) {
             if sel.matches(&elem_ref) {
                 out.push(id);
@@ -82,9 +90,20 @@ impl Document {
         result
     }
 
-    fn collect_by_tag(&self, id: NodeId, tag: &str, include_self: bool, out: &mut Vec<NodeId>, depth: usize) {
-        if depth >= MAX_TREE_DEPTH { return; }
-        let Some(node) = self.tree.get(id) else { return };
+    fn collect_by_tag(
+        &self,
+        id: NodeId,
+        tag: &str,
+        include_self: bool,
+        out: &mut Vec<NodeId>,
+        depth: usize,
+    ) {
+        if depth >= MAX_TREE_DEPTH {
+            return;
+        }
+        let Some(node) = self.tree.get(id) else {
+            return;
+        };
 
         if let Node::Element(e) = node.value() {
             let matches = tag == "*" || e.name.local.as_ref() == tag;
@@ -106,14 +125,21 @@ impl Document {
         // Remove all existing children.
         let children: Vec<NodeId> = self.child_nodes(id);
         for child_id in children {
-            self.tree.get_mut(child_id).expect("child NodeId from same tree").detach();
+            self.tree
+                .get_mut(child_id)
+                .expect("child NodeId from same tree")
+                .detach();
         }
 
         // Parse fragment as a full document and transfer body children.
         let fragment = Document::parse(html);
-        let Some(frag_body) = fragment.body() else { return };
+        let Some(frag_body) = fragment.body() else {
+            return;
+        };
 
-        let frag_children: Vec<NodeId> = fragment.tree.get(frag_body)
+        let frag_children: Vec<NodeId> = fragment
+            .tree
+            .get(frag_body)
             .map(|n| n.children().map(|c| c.id()).collect())
             .unwrap_or_default();
 

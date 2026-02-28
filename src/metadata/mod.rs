@@ -9,6 +9,7 @@ use chrono::Datelike;
 use regex::Regex;
 
 use crate::dom::Document;
+use crate::extraction::html_processing::prune_unwanted_nodes;
 use crate::options::{HtmlDateMode, Options};
 use crate::result::Metadata;
 use crate::selector::metadata::{
@@ -17,13 +18,12 @@ use crate::selector::metadata::{
 use crate::selector::query_all;
 use crate::utils::regex_patterns::{
     AUTHOR_DIGITS, AUTHOR_EMAIL, AUTHOR_HTML, AUTHOR_NICKNAME, AUTHOR_PREFIX, AUTHOR_PREPOSITION,
-    AUTHOR_SEPARATOR, AUTHOR_SOCIAL_MEDIA, AUTHOR_SPACE_CHARS, AUTHOR_SPECIAL_CHARS, CC_LICENSE,
-    CC_LICENSE_TEXT, CATEGORY_HREF, HTML_STRIP_TAG, SITENAME_FINDER, TAG_HREF, TITLE_CLEANER,
+    AUTHOR_SEPARATOR, AUTHOR_SOCIAL_MEDIA, AUTHOR_SPACE_CHARS, AUTHOR_SPECIAL_CHARS, CATEGORY_HREF,
+    CC_LICENSE, CC_LICENSE_TEXT, HTML_STRIP_TAG, SITENAME_FINDER, TAG_HREF, TITLE_CLEANER,
     URL_CHECK,
 };
 use crate::utils::url::{get_base_url, validate_url};
 use crate::utils::{remove_emojis, str_or, trim, unescape_html, uniquify_lists};
-use crate::extraction::html_processing::prune_unwanted_nodes;
 
 // ---------------------------------------------------------------------------
 // Static meta-name lookup sets
@@ -31,10 +31,23 @@ use crate::extraction::html_processing::prune_unwanted_nodes;
 
 static META_NAME_AUTHOR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "article:author", "atc-metaauthor", "author", "authors", "byl",
-        "citation_author", "creator", "dc.creator", "dc.creator.aut", "dc:creator",
-        "dcterms.creator", "dcterms.creator.aut", "dcsext.author", "parsely-author",
-        "rbauthors", "sailthru.author", "shareaholic:article_author_name",
+        "article:author",
+        "atc-metaauthor",
+        "author",
+        "authors",
+        "byl",
+        "citation_author",
+        "creator",
+        "dc.creator",
+        "dc.creator.aut",
+        "dc:creator",
+        "dcterms.creator",
+        "dcterms.creator.aut",
+        "dcsext.author",
+        "parsely-author",
+        "rbauthors",
+        "sailthru.author",
+        "shareaholic:article_author_name",
     ]
     .into_iter()
     .collect()
@@ -42,9 +55,17 @@ static META_NAME_AUTHOR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static META_NAME_TITLE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "citation_title", "dc.title", "dcterms.title", "fb_title",
-        "headline", "parsely-title", "sailthru.title", "shareaholic:title",
-        "rbtitle", "title", "twitter:title",
+        "citation_title",
+        "dc.title",
+        "dcterms.title",
+        "fb_title",
+        "headline",
+        "parsely-title",
+        "sailthru.title",
+        "shareaholic:title",
+        "rbtitle",
+        "title",
+        "twitter:title",
     ]
     .into_iter()
     .collect()
@@ -52,9 +73,13 @@ static META_NAME_TITLE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static META_NAME_DESCRIPTION: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "dc.description", "dc:description",
-        "dcterms.abstract", "dcterms.description",
-        "description", "sailthru.description", "twitter:description",
+        "dc.description",
+        "dc:description",
+        "dcterms.abstract",
+        "dcterms.description",
+        "description",
+        "sailthru.description",
+        "twitter:description",
     ]
     .into_iter()
     .collect()
@@ -62,9 +87,16 @@ static META_NAME_DESCRIPTION: LazyLock<HashSet<&'static str>> = LazyLock::new(||
 
 static META_NAME_PUBLISHER: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "article:publisher", "citation_journal_title", "copyright",
-        "dc.publisher", "dc:publisher", "dcterms.publisher",
-        "publisher", "sailthru.publisher", "rbpubname", "twitter:site",
+        "article:publisher",
+        "citation_journal_title",
+        "copyright",
+        "dc.publisher",
+        "dc:publisher",
+        "dcterms.publisher",
+        "publisher",
+        "sailthru.publisher",
+        "rbpubname",
+        "twitter:site",
     ]
     .into_iter()
     .collect()
@@ -72,8 +104,12 @@ static META_NAME_PUBLISHER: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static META_NAME_TAG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "citation_keywords", "dcterms.subject", "keywords",
-        "parsely-tags", "shareaholic:keywords", "tags",
+        "citation_keywords",
+        "dcterms.subject",
+        "keywords",
+        "parsely-tags",
+        "shareaholic:keywords",
+        "tags",
     ]
     .into_iter()
     .collect()
@@ -81,8 +117,12 @@ static META_NAME_TAG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static META_NAME_IMAGE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "image", "og:image", "og:image:url", "og:image:secure_url",
-        "twitter:image", "twitter:image:src",
+        "image",
+        "og:image",
+        "og:image:url",
+        "og:image:secure_url",
+        "twitter:image",
+        "twitter:image:src",
     ]
     .into_iter()
     .collect()
@@ -205,14 +245,23 @@ static PROPERTY_MODIFIED: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 /// Meta `name` attributes indicating modification date.
 /// Port of `attrModifiedNames` in go-htmldate.
 static ATTR_MODIFIED_NAMES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    ["lastdate", "lastmod", "lastmodified", "last-modified", "modified", "utime"]
-        .into_iter()
-        .collect()
+    [
+        "lastdate",
+        "lastmod",
+        "lastmodified",
+        "last-modified",
+        "modified",
+        "utime",
+    ]
+    .into_iter()
+    .collect()
 });
 
 /// itemprop values for original publication date.
 static ITEM_PROP_ORIGINAL: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    ["datecreated", "datepublished", "pubyear"].into_iter().collect()
+    ["datecreated", "datepublished", "pubyear"]
+        .into_iter()
+        .collect()
 });
 
 /// itemprop values for modified date.
@@ -222,19 +271,15 @@ static ITEM_PROP_MODIFIED: LazyLock<HashSet<&'static str>> =
 /// Regex for extracting YYYY-MM-DD (with -, /, . separators) from a string.
 /// Port of rxYmdPattern in go-htmldate.
 static DATE_YMD_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?:^|\D)((?:199[0-9]|20[0-3][0-9]))[/\-.]([0-1]?[0-9])[/\-.]([0-3]?[0-9])(?:\D|$)",
-    )
-    .unwrap()
+    Regex::new(r"(?:^|\D)((?:199[0-9]|20[0-3][0-9]))[/\-.]([0-1]?[0-9])[/\-.]([0-3]?[0-9])(?:\D|$)")
+        .unwrap()
 });
 
 /// Regex for extracting a YYYY/MM/DD or YYYY-MM-DD date from a URL path.
 /// Port of rxCompleteUrl in go-htmldate (uses [/_-] separators, no dot).
 static DATE_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?i)\D((?:199[0-9]|20[0-3][0-9]))[/_\-]([0-1]?[0-9])[/_\-]([0-3]?[0-9])(?:\D|$)",
-    )
-    .unwrap()
+    Regex::new(r"(?i)\D((?:199[0-9]|20[0-3][0-9]))[/_\-]([0-1]?[0-9])[/_\-]([0-3]?[0-9])(?:\D|$)")
+        .unwrap()
 });
 
 /// Regex for YYYYMMDD without separator.
@@ -330,9 +375,7 @@ pub fn extract_metadata(doc: &Document, opts: &Options) -> Metadata {
 
         // Title-case if it looks like a word (no dot, not already titled).
         let first = metadata.sitename.chars().next();
-        if !metadata.sitename.contains('.')
-            && !first.map(|c| c.is_uppercase()).unwrap_or(false)
-        {
+        if !metadata.sitename.contains('.') && !first.map(|c| c.is_uppercase()).unwrap_or(false) {
             metadata.sitename = title_case(&metadata.sitename);
         }
     } else if !metadata.url.is_empty() {
@@ -451,8 +494,7 @@ fn examine_meta(doc: &Document) -> Metadata {
                     metadata.author = normalize_authors(&metadata.author, &content);
                 }
                 "description" => {
-                    metadata.description =
-                        str_or(&[&metadata.description, &content]).to_string();
+                    metadata.description = str_or(&[&metadata.description, &content]).to_string();
                 }
                 "headline" => {
                     metadata.title = str_or(&[&metadata.title, &content]).to_string();
@@ -559,8 +601,14 @@ fn examine_title_element(doc: &Document) -> (String, String, String) {
     }
 
     if let Some(caps) = TITLE_CLEANER.captures(&title) {
-        let first = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
-        let second = caps.get(2).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let first = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
+        let second = caps
+            .get(2)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         (title, first, second)
     } else {
         (title, String::new(), String::new())
@@ -638,8 +686,7 @@ fn extract_dom_url(doc: &Document) -> String {
     if !url.is_empty() && url.starts_with('/') {
         for node_id in doc.query_selector_all(doc.root(), "head meta[content]") {
             let node_name = trim(&doc.get_attribute(node_id, "name").unwrap_or_default());
-            let node_property =
-                trim(&doc.get_attribute(node_id, "property").unwrap_or_default());
+            let node_property = trim(&doc.get_attribute(node_id, "property").unwrap_or_default());
             let attr_type = str_or(&[&node_name, &node_property]).to_string();
             if attr_type.is_empty() {
                 continue;
@@ -751,7 +798,11 @@ fn clean_cat_tags(cat_tags: Vec<String>) -> Vec<String> {
 }
 
 /// Port of `extractDomMetaSelectors`.
-fn extract_dom_meta_selectors(doc: &Document, limit: usize, rules: &[crate::selector::Rule]) -> String {
+fn extract_dom_meta_selectors(
+    doc: &Document,
+    limit: usize,
+    rules: &[crate::selector::Rule],
+) -> String {
     let root = doc.root();
     for &rule in rules {
         for node_id in query_all(doc, root, &[rule]) {
@@ -790,7 +841,11 @@ fn extract_license(doc: &Document) -> String {
 }
 
 /// Port of `parseLicenseElement`.
-fn parse_license_element(doc: &Document, node_id: crate::dom::NodeId, strict: bool) -> Option<String> {
+fn parse_license_element(
+    doc: &Document,
+    node_id: crate::dom::NodeId,
+    strict: bool,
+) -> Option<String> {
     // Check href for CC license.
     let href = trim(&doc.get_attribute(node_id, "href").unwrap_or_default());
     if !href.is_empty() {
@@ -867,9 +922,7 @@ pub(crate) fn normalize_authors(authors: &str, input: &str) -> String {
         // Title-case if not already.
         let a = {
             let first = a.chars().next();
-            if !first.map(|c| c.is_uppercase()).unwrap_or(false)
-                || a.to_lowercase() == a
-            {
+            if !first.map(|c| c.is_uppercase()).unwrap_or(false) || a.to_lowercase() == a {
                 title_case(&a)
             } else {
                 a
@@ -942,7 +995,11 @@ fn examine_meta_date(doc: &Document) -> Option<chrono::NaiveDate> {
         if content.is_empty() && datetime.is_empty() {
             continue;
         }
-        let val = if !content.is_empty() { &content } else { &datetime };
+        let val = if !content.is_empty() {
+            &content
+        } else {
+            &datetime
+        };
 
         let name = doc
             .get_attribute(node_id, "name")
@@ -1004,7 +1061,11 @@ fn examine_meta_date(doc: &Document) -> Option<chrono::NaiveDate> {
                 }
             }
         } else if !itemprop.is_empty() {
-            let attr_val = if !datetime.is_empty() { &datetime } else { &content };
+            let attr_val = if !datetime.is_empty() {
+                &datetime
+            } else {
+                &content
+            };
             if !attr_val.is_empty() {
                 if ITEM_PROP_ORIGINAL.contains(itemprop.as_str()) {
                     // itemPropOriginal → main date (UseOriginalDate=true)
@@ -1388,27 +1449,23 @@ mod tests {
 
     #[test]
     fn test_examine_meta_og_title() {
-        let doc = parse(
-            r#"<html><head><meta property="og:title" content="My Article"/></head></html>"#,
-        );
+        let doc =
+            parse(r#"<html><head><meta property="og:title" content="My Article"/></head></html>"#);
         let meta = examine_meta(&doc);
         assert_eq!(meta.title, "My Article");
     }
 
     #[test]
     fn test_examine_meta_og_author() {
-        let doc = parse(
-            r#"<html><head><meta property="og:author" content="Jane Doe"/></head></html>"#,
-        );
+        let doc =
+            parse(r#"<html><head><meta property="og:author" content="Jane Doe"/></head></html>"#);
         let meta = examine_meta(&doc);
         assert_eq!(meta.author, "Jane Doe");
     }
 
     #[test]
     fn test_examine_meta_name_author() {
-        let doc = parse(
-            r#"<html><head><meta name="author" content="John Smith"/></head></html>"#,
-        );
+        let doc = parse(r#"<html><head><meta name="author" content="John Smith"/></head></html>"#);
         let meta = examine_meta(&doc);
         assert!(meta.author.contains("John Smith"), "got: {}", meta.author);
     }
@@ -1428,15 +1485,16 @@ mod tests {
 
     #[test]
     fn test_extract_dom_title_single_h1() {
-        let doc =
-            parse(r#"<html><body><h1>Single Heading</h1><p>text</p></body></html>"#);
+        let doc = parse(r#"<html><body><h1>Single Heading</h1><p>text</p></body></html>"#);
         let title = extract_dom_title(&doc);
         assert_eq!(title, "Single Heading");
     }
 
     #[test]
     fn test_extract_dom_title_from_title_tag() {
-        let doc = parse(r#"<html><head><title>Article – Site Name</title></head><body><h1>A</h1><h1>B</h1></body></html>"#);
+        let doc = parse(
+            r#"<html><head><title>Article – Site Name</title></head><body><h1>A</h1><h1>B</h1></body></html>"#,
+        );
         let title = extract_dom_title(&doc);
         // TITLE_CLEANER splits on – and returns "Article".
         assert_eq!(title, "Article");
@@ -1448,7 +1506,9 @@ mod tests {
 
     #[test]
     fn test_extract_license_cc_href() {
-        let doc = parse(r#"<html><body><a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">CC</a></body></html>"#);
+        let doc = parse(
+            r#"<html><body><a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">CC</a></body></html>"#,
+        );
         let lic = extract_license(&doc);
         assert!(lic.starts_with("CC BY-SA"), "got: {lic}");
     }
@@ -1459,11 +1519,13 @@ mod tests {
 
     #[test]
     fn test_extract_metadata_og_basic() {
-        let doc = parse(r#"<html><head>
+        let doc = parse(
+            r#"<html><head>
             <meta property="og:title" content="Test Title"/>
             <meta property="og:description" content="Test Description"/>
             <meta name="author" content="Test Author"/>
-        </head><body></body></html>"#);
+        </head><body></body></html>"#,
+        );
         let meta = extract_metadata(&doc, &Options::default());
         assert_eq!(meta.title, "Test Title");
         assert_eq!(meta.description, "Test Description");
@@ -1472,12 +1534,14 @@ mod tests {
 
     #[test]
     fn test_extract_metadata_json_ld_overrides_og() {
-        let doc = parse(r#"<html><head>
+        let doc = parse(
+            r#"<html><head>
             <meta property="og:title" content="OG Title"/>
             <script type="application/ld+json">
             {"@type":"Article","name":"LD Title","author":{"@type":"Person","name":"LD Author"}}
             </script>
-        </head><body></body></html>"#);
+        </head><body></body></html>"#,
+        );
         let meta = extract_metadata(&doc, &Options::default());
         // JSON-LD title should fill in since OG title is already set.
         // Depending on order: OG is extracted first, JSON-LD uses strOr (keeps non-empty OG).
@@ -1519,7 +1583,10 @@ mod tests {
         let mut opts = Options::default();
         opts.html_date_mode = HtmlDateMode::Disabled;
         let meta = extract_metadata(&doc, &opts);
-        assert!(meta.date.is_none(), "Disabled mode should skip date extraction");
+        assert!(
+            meta.date.is_none(),
+            "Disabled mode should skip date extraction"
+        );
     }
 
     #[test]
@@ -1532,7 +1599,11 @@ mod tests {
         let mut opts = Options::default();
         opts.html_date_override = Some(override_date);
         let meta = extract_metadata(&doc, &opts);
-        assert_eq!(meta.date, Some(override_date), "Override date should be used verbatim");
+        assert_eq!(
+            meta.date,
+            Some(override_date),
+            "Override date should be used verbatim"
+        );
     }
 
     #[test]
@@ -1562,7 +1633,11 @@ mod tests {
         let opts = Options::default();
         let meta = extract_metadata(&doc, &opts);
         let expected = chrono::NaiveDate::from_ymd_opt(2017, 9, 1).unwrap();
-        assert_eq!(meta.date, Some(expected), "Date should be extracted from og:url path");
+        assert_eq!(
+            meta.date,
+            Some(expected),
+            "Date should be extracted from og:url path"
+        );
     }
 
     /// og:url without a date in the path should not produce a date.
@@ -1574,7 +1649,10 @@ mod tests {
         let doc = parse(html);
         let opts = Options::default();
         let meta = extract_metadata(&doc, &opts);
-        assert!(meta.date.is_none(), "URL without date should not produce a date");
+        assert!(
+            meta.date.is_none(),
+            "URL without date should not produce a date"
+        );
     }
 
     /// A stronger publication-time meta should win over og:url.
@@ -1589,6 +1667,10 @@ mod tests {
         let meta = extract_metadata(&doc, &opts);
         // article:published_time is in DATE_ATTRIBUTES → always returned first (main date).
         let expected = chrono::NaiveDate::from_ymd_opt(2020, 6, 1).unwrap();
-        assert_eq!(meta.date, Some(expected), "article:published_time beats og:url reserve date");
+        assert_eq!(
+            meta.date,
+            Some(expected),
+            "article:published_time beats og:url reserve date"
+        );
     }
 }
