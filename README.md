@@ -77,6 +77,39 @@ trafilatura --links https://example.com/article
    extraction or baseline (last-resort) extraction
 5. Filter duplicates and check language constraints
 
+## Benchmarks
+
+### Speed
+
+| Document | Size | Time | Throughput |
+|----------|-----:|-----:|-----------:|
+| small | 6 KB | 793 µs | 14 MiB/s |
+| medium | 85 KB | 5.7 ms | 31 MiB/s |
+| large | 382 KB | 3.6 ms | 101 MiB/s |
+| xlarge | 906 KB | 10.4 ms | 83 MiB/s |
+
+### Extraction quality
+
+Evaluated on a 960-entry dataset (strings expected to be present/absent in extracted text):
+
+| Implementation | Precision | Recall | Accuracy | F-score |
+|----------------|----------:|-------:|---------:|--------:|
+| **Rust** (balanced + fallback) | 0.908 | 0.919 | 0.913 | 0.913 |
+| Python trafilatura | 0.920 | 0.909 | 0.915 | 0.914 |
+| Go go-trafilatura | 0.909 | 0.921 | 0.914 | 0.915 |
+
+All three implementations produce near-identical quality scores. Minor differences stem from HTML parser handling and Unicode normalization.
+
+Measured on Apple M4 Max, Rust 1.93, macOS 15.7.
+
+Reproduce:
+
+```sh
+cargo bench                                            # speed benchmarks
+cargo test --test comparison_test -- --nocapture       # Rust quality scores
+python3 scripts/compare_python.py > /dev/null          # Python quality (stderr)
+```
+
 ## License
 
 Apache-2.0
