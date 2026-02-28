@@ -973,9 +973,9 @@ dependencies = [
 
 [[package]]
 name = "justext"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03f91c92b7636e276eb32a5516c6f7fffdfa626f8a018c8e208247b41d1b1f15"
+checksum = "58abeb753acf0dcec3849d01739e9e06e5f896985b33aad192163e70706b55db"
 dependencies = [
  "ego-tree",
  "scraper",
@@ -1002,9 +1002,9 @@ checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
 
 [[package]]
 name = "libreadability"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0847b186b5dcff668a228c9e2643ebb5ed768a692af569e2987e5fbf462ed990"
+checksum = "0575f04cb61dd282cf75463426b6d2384db3fb07f7a3c3ba419c5414c3482ff7"
 dependencies = [
  "chrono",
  "dateparser",
