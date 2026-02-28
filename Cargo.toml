@@ -29,8 +29,8 @@ clap = { version = "4", features = ["derive"], optional = true }
 reqwest = { version = "0.12", features = ["blocking"], optional = true }
 ego-tree = "0.10"
 html5ever = "0.36"
-justext = { version = "0.1", path = "../justext-rs" }
-libreadability = { version = "0.1", path = "../readability-rs" }
+justext = "0.1"
+libreadability = "0.1"
 regex = "1"
 scraper = "0.25"
 serde = { version = "1", features = ["derive"] }
