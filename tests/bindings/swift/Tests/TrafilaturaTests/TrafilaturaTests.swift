@@ -133,10 +133,10 @@ final class TrafilaturaTests: XCTestCase {
         XCTAssertFalse(opts.includeImages)
         XCTAssertFalse(opts.includeLinks)
         XCTAssertFalse(opts.deduplicate)
-        XCTAssertFalse(opts.hasEssentialMetadata)
+        XCTAssertFalse(opts.requireEssentialMetadata)
         XCTAssertNil(opts.maxTreeSize)
         XCTAssertNil(opts.pruneSelector)
-        XCTAssertEqual(opts.htmlDateMode, .`default`)
+        XCTAssertEqual(opts.htmlDateMode, .automatic)
         XCTAssertNil(opts.htmlDateOverride)
     }
 

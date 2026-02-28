@@ -131,10 +131,10 @@ class TrafilaturaTest {
             assertFalse(opts.includeImages)
             assertFalse(opts.includeLinks)
             assertFalse(opts.deduplicate)
-            assertFalse(opts.hasEssentialMetadata)
+            assertFalse(opts.requireEssentialMetadata)
             assertNull(opts.maxTreeSize)
             assertNull(opts.pruneSelector)
-            assertEquals(HtmlDateMode.DEFAULT, opts.htmlDateMode)
+            assertEquals(HtmlDateMode.AUTOMATIC, opts.htmlDateMode)
             assertNull(opts.htmlDateOverride)
         }
     }
@@ -144,10 +144,10 @@ class TrafilaturaTest {
         @Test fun `default config values`() {
             // Defaults from trafilatura::Config::default()
             val config = defaultConfig()
-            assertEquals(250.toULong(), config.minExtractedSize)
-            assertEquals(1.toULong(), config.minExtractedCommentSize)
-            assertEquals(1.toULong(), config.minOutputSize)
-            assertEquals(1.toULong(), config.minOutputCommentSize)
+            assertEquals(250L, config.minExtractedSize)
+            assertEquals(1L, config.minExtractedCommentSize)
+            assertEquals(1L, config.minOutputSize)
+            assertEquals(1L, config.minOutputCommentSize)
         }
     }
 }

@@ -28,8 +28,8 @@ def test_default_options_values():
     assert opts.include_images is False
     assert opts.include_links is False
     assert opts.deduplicate is False
-    assert opts.has_essential_metadata is False
+    assert opts.require_essential_metadata is False
     assert opts.max_tree_size is None
     assert opts.prune_selector is None
-    assert opts.html_date_mode == HtmlDateMode.DEFAULT
+    assert opts.html_date_mode == HtmlDateMode.AUTOMATIC
     assert opts.html_date_override is None

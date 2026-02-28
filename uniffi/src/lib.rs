@@ -16,7 +16,7 @@ pub enum TrafilaturaError {
     #[error("extracted body is a duplicate")]
     DuplicateContent,
     #[error("output tree too large: {size} elements")]
-    TreeTooLarge { size: u64 },
+    TreeTooLarge { size: i64 },
 }
 
 impl From<trafilatura::TrafilaturaError> for TrafilaturaError {
@@ -38,7 +38,7 @@ impl From<trafilatura::TrafilaturaError> for TrafilaturaError {
             }
             trafilatura::TrafilaturaError::DuplicateContent => TrafilaturaError::DuplicateContent,
             trafilatura::TrafilaturaError::TreeTooLarge(n) => {
-                TrafilaturaError::TreeTooLarge { size: n as u64 }
+                TrafilaturaError::TreeTooLarge { size: n as i64 }
             }
             // non_exhaustive catch-all
             _ => TrafilaturaError::ParseError {
@@ -61,7 +61,7 @@ pub enum ExtractionFocus {
 /// Date extraction mode.
 #[derive(uniffi::Enum)]
 pub enum HtmlDateMode {
-    Default,
+    Automatic,
     Fast,
     Extensive,
     Disabled,
@@ -72,10 +72,10 @@ pub enum HtmlDateMode {
 /// Advanced tuning parameters.
 #[derive(uniffi::Record)]
 pub struct ExtractionConfig {
-    pub min_extracted_size: u64,
-    pub min_extracted_comment_size: u64,
-    pub min_output_size: u64,
-    pub min_output_comment_size: u64,
+    pub min_extracted_size: i64,
+    pub min_extracted_comment_size: i64,
+    pub min_output_size: i64,
+    pub min_output_comment_size: i64,
 }
 
 /// Extraction options.
@@ -93,8 +93,8 @@ pub struct ExtractionOptions {
     pub include_images: bool,
     pub include_links: bool,
     pub deduplicate: bool,
-    pub has_essential_metadata: bool,
-    pub max_tree_size: Option<u64>,
+    pub require_essential_metadata: bool,
+    pub max_tree_size: Option<i64>,
     /// CSS selector for pre-pruning elements.
     pub prune_selector: Option<String>,
     pub html_date_mode: HtmlDateMode,
@@ -179,10 +179,10 @@ pub fn create_readable_document(result: ExtractResult) -> String {
 
 fn to_ffi_config(c: &trafilatura::Config) -> ExtractionConfig {
     ExtractionConfig {
-        min_extracted_size: c.min_extracted_size as u64,
-        min_extracted_comment_size: c.min_extracted_comment_size as u64,
-        min_output_size: c.min_output_size as u64,
-        min_output_comment_size: c.min_output_comment_size as u64,
+        min_extracted_size: c.min_extracted_size as i64,
+        min_extracted_comment_size: c.min_extracted_comment_size as i64,
+        min_output_size: c.min_output_size as i64,
+        min_output_comment_size: c.min_output_comment_size as i64,
     }
 }
 
@@ -204,16 +204,16 @@ fn to_ffi_options(opts: &trafilatura::Options) -> ExtractionOptions {
         include_images: opts.include_images,
         include_links: opts.include_links,
         deduplicate: opts.deduplicate,
-        has_essential_metadata: opts.has_essential_metadata,
-        max_tree_size: opts.max_tree_size.map(|n| n as u64),
+        require_essential_metadata: opts.has_essential_metadata,
+        max_tree_size: opts.max_tree_size.map(|n| n as i64),
         prune_selector: opts.prune_selector.clone(),
         html_date_mode: match opts.html_date_mode {
-            trafilatura::HtmlDateMode::Default => HtmlDateMode::Default,
+            trafilatura::HtmlDateMode::Default => HtmlDateMode::Automatic,
             trafilatura::HtmlDateMode::Fast => HtmlDateMode::Fast,
             trafilatura::HtmlDateMode::Extensive => HtmlDateMode::Extensive,
             trafilatura::HtmlDateMode::Disabled => HtmlDateMode::Disabled,
             // New upstream variants fall back to Default; update when core adds variants.
-            _ => HtmlDateMode::Default,
+            _ => HtmlDateMode::Automatic,
         },
         html_date_override: opts.html_date_override.map(|d| d.to_string()),
     }
@@ -222,14 +222,13 @@ fn to_ffi_options(opts: &trafilatura::Options) -> ExtractionOptions {
 fn to_core_options(
     opts: &ExtractionOptions,
 ) -> Result<trafilatura::Options, TrafilaturaError> {
-    let cap = usize::MAX as u64;
     let mut core = trafilatura::Options::default();
 
     core.config = trafilatura::Config::default()
-        .with_min_extracted_size(opts.config.min_extracted_size.min(cap) as usize)
-        .with_min_extracted_comment_size(opts.config.min_extracted_comment_size.min(cap) as usize)
-        .with_min_output_size(opts.config.min_output_size.min(cap) as usize)
-        .with_min_output_comment_size(opts.config.min_output_comment_size.min(cap) as usize);
+        .with_min_extracted_size(opts.config.min_extracted_size.max(0) as usize)
+        .with_min_extracted_comment_size(opts.config.min_extracted_comment_size.max(0) as usize)
+        .with_min_output_size(opts.config.min_output_size.max(0) as usize)
+        .with_min_output_comment_size(opts.config.min_output_comment_size.max(0) as usize);
 
     if let Some(ref url_str) = opts.original_url {
         core.original_url = Some(
@@ -251,11 +250,11 @@ fn to_core_options(
     core.include_images = opts.include_images;
     core.include_links = opts.include_links;
     core.deduplicate = opts.deduplicate;
-    core.has_essential_metadata = opts.has_essential_metadata;
-    core.max_tree_size = opts.max_tree_size.map(|n| n.min(cap) as usize);
+    core.has_essential_metadata = opts.require_essential_metadata;
+    core.max_tree_size = opts.max_tree_size.map(|n| n.max(0) as usize);
     core.prune_selector = opts.prune_selector.clone();
     core.html_date_mode = match opts.html_date_mode {
-        HtmlDateMode::Default => trafilatura::HtmlDateMode::Default,
+        HtmlDateMode::Automatic => trafilatura::HtmlDateMode::Default,
         HtmlDateMode::Fast => trafilatura::HtmlDateMode::Fast,
         HtmlDateMode::Extensive => trafilatura::HtmlDateMode::Extensive,
         HtmlDateMode::Disabled => trafilatura::HtmlDateMode::Disabled,
