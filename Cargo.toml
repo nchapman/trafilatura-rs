@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/nchapman/trafilatura-rs"
 keywords = ["trafilatura", "extraction", "html", "scraping", "content"]
 categories = ["parser-implementations", "text-processing", "web-programming"]
-exclude = ["test-files/", "benches/", "scripts/"]
+exclude = ["test-files/", "benches/", "scripts/", "CLAUDE.md", "PLAN.md"]
 
 [lib]
 name = "trafilatura"
