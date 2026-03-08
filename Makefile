@@ -31,38 +31,11 @@ BINDGEN := $(CARGO) run --manifest-path $(UNIFFI_DIR)/Cargo.toml --features cli 
 
 GENERATED_DIR := $(UNIFFI_DIR)/generated
 
-$(GENERATED_DIR)/python: cargo-build
-	$(BINDGEN) generate --library $(CDYLIB) --language python --out-dir $@
-
 $(GENERATED_DIR)/swift: cargo-build
 	$(BINDGEN) generate --library $(CDYLIB) --language swift --out-dir $@
 
 $(GENERATED_DIR)/kotlin: cargo-build
 	$(BINDGEN) generate --library $(CDYLIB) --language kotlin --out-dir $@
-
-# --- Python ---
-
-VENV := .venv
-PIP := $(VENV)/bin/pip
-
-$(VENV):
-	$(call require,python3)
-	python3 -m venv $(VENV)
-	$(PIP) install --upgrade pip
-
-.PHONY: setup-python
-setup-python: $(VENV)
-	$(PIP) install -r requirements-dev.txt
-
-# Python uses maturin (bindgen implicit); Swift/Kotlin use explicit uniffi-bindgen generate
-.PHONY: build-python
-build-python: $(VENV)
-	$(call require,python3)
-	$(VENV)/bin/maturin develop --manifest-path $(UNIFFI_DIR)/Cargo.toml --release
-
-.PHONY: test-python
-test-python: build-python
-	$(VENV)/bin/pytest tests/bindings/python/ -v
 
 # --- Swift ---
 
@@ -103,12 +76,11 @@ test-kotlin: build-kotlin
 # --- Aggregate ---
 
 .PHONY: test-bindings
-test-bindings: test-python test-swift test-kotlin
+test-bindings: test-swift test-kotlin
 
 .PHONY: clean
 clean:
 	rm -rf $(GENERATED_DIR)
-	rm -rf $(VENV)
 	rm -rf $(SWIFT_TEST_DIR)/.build
 	rm -rf $(KOTLIN_TEST_DIR)/build $(KOTLIN_TEST_DIR)/.gradle
 	cd $(UNIFFI_DIR) && $(CARGO) clean
