@@ -29,6 +29,7 @@ cargo-build:
 
 BINDGEN := $(CARGO) run --manifest-path $(UNIFFI_DIR)/Cargo.toml --features cli --bin uniffi-bindgen --
 DART_BINDGEN := $(CARGO) run --manifest-path $(UNIFFI_DIR)/Cargo.toml --features dart-cli --bin uniffi-bindgen-dart --
+CS_BINDGEN := uniffi-bindgen-cs
 
 GENERATED_DIR := $(UNIFFI_DIR)/generated
 
@@ -43,6 +44,16 @@ $(GENERATED_DIR)/kotlin: cargo-build
 
 $(GENERATED_DIR)/dart: cargo-build
 	$(DART_BINDGEN) generate --library $(CDYLIB) --out-dir $@ --crate trafilatura_uniffi
+
+$(GENERATED_DIR)/cs: cargo-build
+	$(call require,$(CS_BINDGEN))
+	$(CS_BINDGEN) --library $(CDYLIB) --out-dir $@
+	@# Patch contract version: uniffi-bindgen-cs v0.10 emits contract 29 (uniffi 0.29)
+	@# but this project uses uniffi 0.31 (contract 30). The ABI is compatible
+	@# because we only use free functions and value types (no callback interfaces).
+	perl -i -pe 's/\bif \(29 != /if (30 != /; s/expected version `29`/expected version `30`/' $@/trafilatura_uniffi.cs
+	@grep -q 'if (30 != ' $@/trafilatura_uniffi.cs || \
+		(echo "ERROR: contract version patch failed — check uniffi-bindgen-cs version" && exit 1)
 
 # --- Swift ---
 
@@ -111,10 +122,27 @@ build-dart: $(GENERATED_DIR)/dart cargo-build
 test-dart: build-dart
 	cd $(DART_TEST_DIR) && dart test -r expanded
 
+# --- C# ---
+
+CS_TEST_DIR := tests/bindings/cs
+
+.PHONY: build-cs
+build-cs: $(GENERATED_DIR)/cs cargo-build
+	$(call require,dotnet)
+	mkdir -p $(CS_TEST_DIR)/lib
+	cp $(GENERATED_DIR)/cs/trafilatura_uniffi.cs $(CS_TEST_DIR)/lib/
+	cd $(CS_TEST_DIR) && dotnet build
+	@# Copy native library next to test binary so DllImport can find it
+	cp $(CDYLIB) $(CS_TEST_DIR)/bin/Debug/net8.0/
+
+.PHONY: test-cs
+test-cs: build-cs
+	cd $(CS_TEST_DIR) && dotnet test --no-build
+
 # --- Aggregate ---
 
 .PHONY: test-bindings
-test-bindings: test-swift test-kotlin test-ruby test-dart
+test-bindings: test-swift test-kotlin test-ruby test-dart test-cs
 
 .PHONY: clean
 clean:
@@ -123,4 +151,5 @@ clean:
 	rm -rf $(KOTLIN_TEST_DIR)/build $(KOTLIN_TEST_DIR)/.gradle
 	rm -rf $(RUBY_TEST_DIR)/vendor $(RUBY_TEST_DIR)/.bundle $(RUBY_TEST_DIR)/Gemfile.lock
 	rm -rf $(DART_TEST_DIR)/.dart_tool $(DART_TEST_DIR)/pubspec.lock
+	rm -rf $(CS_TEST_DIR)/bin $(CS_TEST_DIR)/obj $(CS_TEST_DIR)/lib
 	cd $(UNIFFI_DIR) && $(CARGO) clean
