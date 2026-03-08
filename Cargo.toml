@@ -28,7 +28,7 @@ cli = ["dep:clap", "dep:reqwest", "dep:tracing-subscriber", "markdown"]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"], optional = true }
 reqwest = { version = "0.12", features = ["blocking"], optional = true }
-html2markdown = { path = "../html2markdown-rs", optional = true }
+html2markdown = { version = "0.2", optional = true }
 ego-tree = "0.10"
 html5ever = "0.36"
 justext = "0.2"

@@ -655,6 +655,8 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "html2markdown"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f783639382c391a37ea5a01e3801d31ce1c74f513657d176b546023abba80a8"
 dependencies = [
  "html5ever 0.38.0",
  "markup5ever 0.38.0",
