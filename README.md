@@ -48,11 +48,35 @@ let opts = Options::default()
 let result = extract(html, &opts).unwrap();
 ```
 
+### Markdown output
+
+Enable the `markdown` feature to convert extracted content to Markdown:
+
+```toml
+[dependencies]
+trafilatura = { version = "0.2", features = ["markdown"] }
+```
+
+```rust
+use trafilatura::{extract, create_markdown_document, Options};
+
+let result = extract(html, &Options::default()).unwrap();
+
+// Just the content as markdown:
+let md = result.content_markdown();
+
+// Full document with YAML front matter + content + comments:
+let doc = create_markdown_document(&result);
+```
+
 ### CLI
 
 ```sh
 # Extract from a URL
 trafilatura https://example.com/article
+
+# Extract as markdown (with front matter)
+trafilatura --format md --links https://example.com/article
 
 # Extract from a file
 trafilatura path/to/page.html
@@ -63,7 +87,7 @@ trafilatura --links https://example.com/article
 
 ## What it extracts
 
-- **Content** — main article body as both plain text and cleaned HTML
+- **Content** — main article body as plain text, cleaned HTML, or Markdown
 - **Comments** — user comments, separately from article content
 - **Metadata** — title, author, date, description, site name, categories,
   tags, license, language, and image URL (from meta tags, OpenGraph, JSON-LD)
