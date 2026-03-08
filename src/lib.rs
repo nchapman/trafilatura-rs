@@ -50,6 +50,20 @@
 //! assert_eq!(result.content_text, "Hello world");
 //! ```
 //!
+//! # Markdown output (requires `markdown` feature)
+//!
+//! ```rust,ignore
+//! use trafilatura::{extract, create_markdown_document, Options};
+//!
+//! let result = extract(html, &Options::default()).unwrap();
+//!
+//! // Just the content as markdown:
+//! let md = result.content_markdown();
+//!
+//! // Full document with YAML front matter + content + comments:
+//! let doc = create_markdown_document(&result);
+//! ```
+//!
 //! # Related crates
 //!
 //! - [`libreadability`](https://crates.io/crates/libreadability) — Mozilla Readability
@@ -73,6 +87,9 @@ pub mod utils;
 pub use error::TrafilaturaError;
 pub use options::{Config, ExtractionFocus, FallbackCandidates, HtmlDateMode, Options};
 pub use result::{ExtractResult, Metadata};
+
+#[cfg(feature = "markdown")]
+pub use html2markdown::Options as MarkdownOptions;
 
 use crate::dom::Document;
 use crate::extraction::{
@@ -353,6 +370,148 @@ pub fn create_readable_document(result: &ExtractResult) -> String {
 
     html.push_str("</body></html>");
     html
+}
+
+// ---------------------------------------------------------------------------
+// Markdown document builder
+// ---------------------------------------------------------------------------
+
+/// Creates a complete Markdown document from an [`ExtractResult`], with
+/// metadata encoded as YAML front matter.
+///
+/// The output has the form:
+///
+/// ```text
+/// ---
+/// title: "Article Title"
+/// author: "Jane Doe"
+/// date: "2025-03-07"
+/// ---
+///
+/// Article content in Markdown...
+///
+/// ## Comments
+///
+/// Comments in Markdown...
+/// ```
+///
+/// All string values in front matter are double-quoted for safety. Empty
+/// metadata fields are omitted. This is the Markdown counterpart of
+/// [`create_readable_document`].
+#[cfg(feature = "markdown")]
+pub fn create_markdown_document(result: &ExtractResult) -> String {
+    create_markdown_document_with(result, &MarkdownOptions::default())
+}
+
+/// Creates a complete Markdown document with custom [`MarkdownOptions`].
+///
+/// See [`create_markdown_document`] for details on the output format.
+#[cfg(feature = "markdown")]
+pub fn create_markdown_document_with(
+    result: &ExtractResult,
+    options: &MarkdownOptions,
+) -> String {
+    let mut out = String::with_capacity(1024);
+
+    // Front matter
+    write_front_matter(&mut out, &result.metadata);
+
+    // Content
+    let content = result.content_markdown_with(options);
+    out.push_str(&content);
+
+    // Comments — only emit the heading when there's content to separate from.
+    let comments = result.comments_markdown_with(options);
+    if !comments.is_empty() {
+        // Ensure exactly one blank line before the heading.
+        if !out.ends_with("\n\n") {
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push('\n');
+        }
+        out.push_str("## Comments\n\n");
+        out.push_str(&comments);
+    }
+
+    out
+}
+
+/// Escape a string for use as a YAML double-quoted scalar.
+///
+/// Handles backslash, double-quote, common whitespace escapes, and all
+/// ASCII control characters (per YAML 1.2 §7.3.1).
+#[cfg(feature = "markdown")]
+fn yaml_escape(s: &str) -> String {
+    let mut escaped = String::with_capacity(s.len() + 2);
+    escaped.push('"');
+    for ch in s.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\0' => escaped.push_str("\\0"),
+            // Remaining ASCII control characters and DEL.
+            ch if (ch as u32) < 0x20 || ch == '\x7f' => {
+                escaped.push_str(&format!("\\u{:04X}", ch as u32));
+            }
+            _ => escaped.push(ch),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
+/// Write YAML front matter for the given metadata.
+#[cfg(feature = "markdown")]
+fn write_front_matter(out: &mut String, m: &Metadata) {
+    out.push_str("---\n");
+
+    let date_str = m.date.map(|d| d.format("%Y-%m-%d").to_string());
+
+    for (key, value) in [
+        ("title", Some(m.title.as_str())),
+        ("author", Some(m.author.as_str())),
+        ("url", Some(m.url.as_str())),
+        ("hostname", Some(m.hostname.as_str())),
+        ("description", Some(m.description.as_str())),
+        ("sitename", Some(m.sitename.as_str())),
+        ("date", date_str.as_deref()),
+        ("license", Some(m.license.as_str())),
+        ("language", Some(m.language.as_str())),
+        ("image", Some(m.image.as_str())),
+    ] {
+        if let Some(v) = value {
+            if !v.is_empty() {
+                out.push_str(key);
+                out.push_str(": ");
+                out.push_str(&yaml_escape(v));
+                out.push('\n');
+            }
+        }
+    }
+
+    if !m.categories.is_empty() {
+        out.push_str("categories:\n");
+        for cat in &m.categories {
+            out.push_str("  - ");
+            out.push_str(&yaml_escape(cat));
+            out.push('\n');
+        }
+    }
+
+    if !m.tags.is_empty() {
+        out.push_str("tags:\n");
+        for tag in &m.tags {
+            out.push_str("  - ");
+            out.push_str(&yaml_escape(tag));
+            out.push('\n');
+        }
+    }
+
+    out.push_str("---\n\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -665,5 +824,166 @@ mod tests {
         assert!(html.contains("&quot;quotes&quot;"));
         assert!(html.contains("&amp;"));
         assert!(html.contains("&lt;tags&gt;"));
+    }
+
+    // ---------------------------------------------------------------------------
+    // create_markdown_document
+    // ---------------------------------------------------------------------------
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_create_markdown_document_front_matter() {
+        let result = ExtractResult {
+            content_text: "Hello world".into(),
+            content_html: "<p>Hello world</p>".into(),
+            comments_html: String::new(),
+            metadata: crate::result::Metadata {
+                title: "My Title".into(),
+                author: "Jane Doe".into(),
+                url: "https://example.com/article".into(),
+                hostname: "example.com".into(),
+                description: "A description".into(),
+                sitename: "Example".into(),
+                date: chrono::NaiveDate::from_ymd_opt(2023, 4, 5),
+                categories: vec!["Tech".into(), "News".into()],
+                tags: vec!["rust".into(), "web".into()],
+                license: "CC BY 4.0".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+
+        // Front matter delimiters.
+        assert!(md.starts_with("---\n"), "should start with front matter");
+        assert!(md.contains("\n---\n\n"), "should close front matter");
+
+        // Metadata fields — all values are always double-quoted.
+        assert!(md.contains("title: \"My Title\"\n"));
+        assert!(md.contains("author: \"Jane Doe\"\n"));
+        assert!(md.contains("url: \"https://example.com/article\"\n"));
+        assert!(md.contains("hostname: \"example.com\"\n"));
+        assert!(md.contains("description: \"A description\"\n"));
+        assert!(md.contains("sitename: \"Example\"\n"));
+        assert!(md.contains("date: \"2023-04-05\"\n"));
+        assert!(md.contains("categories:\n  - \"Tech\"\n  - \"News\"\n"));
+        assert!(md.contains("tags:\n  - \"rust\"\n  - \"web\"\n"));
+
+        // Content.
+        assert!(md.contains("Hello world"));
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_create_markdown_document_omits_empty_fields() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            metadata: crate::result::Metadata {
+                title: "Only Title".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+        assert!(md.contains("title: \"Only Title\"\n"));
+        assert!(!md.contains("author:"));
+        assert!(!md.contains("url:"));
+        assert!(!md.contains("date:"));
+        assert!(!md.contains("categories:"));
+        assert!(!md.contains("tags:"));
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_create_markdown_document_with_comments() {
+        let result = ExtractResult {
+            content_html: "<p>Article</p>".into(),
+            comments_html: "<p>A comment</p>".into(),
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+        assert!(md.contains("Article"));
+        assert!(md.contains("\n## Comments\n\n"));
+        assert!(md.contains("A comment"));
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_create_markdown_document_escapes_yaml_special_chars() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            metadata: crate::result::Metadata {
+                title: "Title: with colon".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+        assert!(
+            md.contains(r#"title: "Title: with colon""#),
+            "colons should be quoted"
+        );
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_yaml_escape_backslashes_and_quotes() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            metadata: crate::result::Metadata {
+                title: r#"C:\Users & "quotes""#.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+        assert!(
+            md.contains(r#"title: "C:\\Users & \"quotes\"""#),
+            "backslashes and quotes should be escaped, got: {}",
+            md
+        );
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_yaml_escape_newlines() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            metadata: crate::result::Metadata {
+                title: "Line one\nLine two".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+        assert!(
+            md.contains(r#"title: "Line one\nLine two""#),
+            "newlines should be escaped"
+        );
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn test_yaml_escape_categories_and_tags() {
+        let result = ExtractResult {
+            content_html: "<p>Content</p>".into(),
+            metadata: crate::result::Metadata {
+                categories: vec!["Science: Physics".into(), "*Breaking*".into()],
+                tags: vec!["C:\\path".into()],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let md = create_markdown_document(&result);
+        assert!(md.contains(r#"  - "Science: Physics""#));
+        assert!(md.contains(r#"  - "*Breaking*""#));
+        assert!(md.contains(r#"  - "C:\\path""#));
     }
 }

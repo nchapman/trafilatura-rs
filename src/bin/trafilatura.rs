@@ -5,7 +5,8 @@ use std::io::{self, Read, Write};
 use clap::{Parser, ValueEnum};
 use serde::Serialize;
 use trafilatura::{
-    create_readable_document, extract, ExtractResult, ExtractionFocus, Metadata, Options,
+    create_markdown_document, create_readable_document, extract, ExtractResult, ExtractionFocus,
+    Metadata, Options,
 };
 
 const DEFAULT_USER_AGENT: &str =
@@ -93,6 +94,8 @@ enum OutputFormat {
     Html,
     Txt,
     Json,
+    #[value(alias = "md")]
+    Markdown,
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +238,7 @@ fn write_output(
         OutputFormat::Html => write_html(w, result),
         OutputFormat::Txt => write_text(w, result),
         OutputFormat::Json => write_json(w, result),
+        OutputFormat::Markdown => write_markdown(w, result),
     }
 }
 
@@ -266,6 +270,12 @@ fn write_json(w: &mut dyn Write, result: &ExtractResult) -> io::Result<()> {
     let output = JsonOutput::from(result);
     serde_json::to_writer(&mut *w, &output).map_err(io::Error::other)?;
     writeln!(w)
+}
+
+/// Write extraction result as Markdown with YAML front matter.
+fn write_markdown(w: &mut dyn Write, result: &ExtractResult) -> io::Result<()> {
+    let md = create_markdown_document(result);
+    w.write_all(md.as_bytes())
 }
 
 // ---------------------------------------------------------------------------

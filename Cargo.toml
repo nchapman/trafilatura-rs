@@ -21,12 +21,14 @@ path = "src/bin/trafilatura.rs"
 required-features = ["cli"]
 
 [features]
-cli = ["dep:clap", "dep:reqwest", "dep:tracing-subscriber"]
+markdown = ["dep:html2markdown"]
+cli = ["dep:clap", "dep:reqwest", "dep:tracing-subscriber", "markdown"]
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"], optional = true }
 reqwest = { version = "0.12", features = ["blocking"], optional = true }
+html2markdown = { path = "../html2markdown-rs", optional = true }
 ego-tree = "0.10"
 html5ever = "0.36"
 justext = "0.2"
