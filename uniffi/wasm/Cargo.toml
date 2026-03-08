@@ -1,0 +1,25 @@
+[package]
+name = "trafilatura-uniffi-wasm"
+version = "0.2.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+name = "trafilatura_uniffi"
+
+[dependencies]
+uniffi = { version = "0.31", features = ["scaffolding-ffi-buffer-fns", "wasm-unstable-single-threaded"] }
+thiserror = "2"
+trafilatura = { path = "../.." }
+url = "2"
+chrono = { version = "0.4", default-features = false }
+
+# Override chrono to disable wasm-bindgen (js-sys) for the WASM target.
+# The default chrono feature set enables wasmbind on wasm32, which adds
+# __wbindgen_* imports that the UniFFI JS runtime cannot satisfy.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.4", default-features = false, features = ["wasm_js"] }
+
+[profile.release]
+lto = true

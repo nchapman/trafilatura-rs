@@ -1286,7 +1286,12 @@ fn fast_parse_date(s: &str) -> Option<chrono::NaiveDate> {
 /// Port of `validateDate` in go-htmldate.
 fn is_plausible_date(d: chrono::NaiveDate) -> bool {
     let year = d.year();
+    #[cfg(not(target_arch = "wasm32"))]
     let now_year = chrono::Local::now().year();
+    #[cfg(target_arch = "wasm32")]
+    let now_year = 2035; // Fallback for WASM where chrono::Local is unavailable.
+                         // On wasm32-unknown-unknown neither SystemTime nor js_sys
+                         // is reliably available, so we use a generous upper bound.
     year >= 1995 && year <= now_year + 1
 }
 

@@ -8,7 +8,12 @@ __pycache__/
 
 # JS
 node_modules/
+tests/bindings/js/lib/
 
 # C#
 **/bin/Debug/
 **/obj/
+tests/bindings/cs/lib/
+
+# UniFFI generated bindings
+uniffi/generated/
