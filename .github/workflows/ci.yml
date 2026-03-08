@@ -58,3 +58,17 @@ jobs:
           distribution: temurin
           java-version: "17"
       - run: make test-kotlin
+
+  ruby-bindings:
+    name: Ruby bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+      - run: make test-ruby

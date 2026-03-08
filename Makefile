@@ -31,6 +31,9 @@ BINDGEN := $(CARGO) run --manifest-path $(UNIFFI_DIR)/Cargo.toml --features cli 
 
 GENERATED_DIR := $(UNIFFI_DIR)/generated
 
+$(GENERATED_DIR)/ruby: cargo-build
+	$(BINDGEN) generate --library $(CDYLIB) --language ruby --out-dir $@
+
 $(GENERATED_DIR)/swift: cargo-build
 	$(BINDGEN) generate --library $(CDYLIB) --language swift --out-dir $@
 
@@ -73,14 +76,31 @@ build-kotlin: $(GENERATED_DIR)/kotlin cargo-build
 test-kotlin: build-kotlin
 	cd $(KOTLIN_TEST_DIR) && ./gradlew test
 
+# --- Ruby ---
+
+RUBY_TEST_DIR := tests/bindings/ruby
+
+.PHONY: build-ruby
+build-ruby: $(GENERATED_DIR)/ruby cargo-build
+	$(call require,ruby)
+	$(call require,bundle)
+	mkdir -p $(RUBY_TEST_DIR)/lib
+	cp $(GENERATED_DIR)/ruby/trafilatura_uniffi.rb $(RUBY_TEST_DIR)/lib/
+	cd $(RUBY_TEST_DIR) && bundle install
+
+.PHONY: test-ruby
+test-ruby: build-ruby
+	cd $(RUBY_TEST_DIR) && bundle exec rake test
+
 # --- Aggregate ---
 
 .PHONY: test-bindings
-test-bindings: test-swift test-kotlin
+test-bindings: test-swift test-kotlin test-ruby
 
 .PHONY: clean
 clean:
 	rm -rf $(GENERATED_DIR)
 	rm -rf $(SWIFT_TEST_DIR)/.build
 	rm -rf $(KOTLIN_TEST_DIR)/build $(KOTLIN_TEST_DIR)/.gradle
+	rm -rf $(RUBY_TEST_DIR)/vendor $(RUBY_TEST_DIR)/.bundle $(RUBY_TEST_DIR)/Gemfile.lock
 	cd $(UNIFFI_DIR) && $(CARGO) clean

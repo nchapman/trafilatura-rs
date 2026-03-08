@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+require "shellwords"
+
+# Rake::TestTask spawns a subprocess, which strips DYLD_LIBRARY_PATH on macOS.
+# Work around this by shelling out to ruby directly with the env var set.
+task :test do
+  lib_dir = File.expand_path("../../../uniffi/target/release", __dir__)
+  env_var = RUBY_PLATFORM.include?("darwin") ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH"
+  sh "#{env_var}=#{Shellwords.shellescape(lib_dir)} ruby -Ilib -Itest " \
+     "-e \"Dir.glob('test/**/test_*.rb') { |f| require_relative f }\""
+end
+
+task default: :test
