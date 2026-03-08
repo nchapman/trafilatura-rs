@@ -2,3 +2,13 @@
 *.json.gz
 .venv*/
 __pycache__/
+
+# Dart
+.dart_tool/
+
+# JS
+node_modules/
+
+# C#
+**/bin/Debug/
+**/obj/
