@@ -72,3 +72,15 @@ jobs:
         with:
           ruby-version: '3.2'
       - run: make test-ruby
+
+  dart-bindings:
+    name: Dart bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+      - uses: dart-lang/setup-dart@v1
+      - run: make test-dart
