@@ -407,10 +407,7 @@ pub fn create_markdown_document(result: &ExtractResult) -> String {
 ///
 /// See [`create_markdown_document`] for details on the output format.
 #[cfg(feature = "markdown")]
-pub fn create_markdown_document_with(
-    result: &ExtractResult,
-    options: &MarkdownOptions,
-) -> String {
+pub fn create_markdown_document_with(result: &ExtractResult, options: &MarkdownOptions) -> String {
     let mut out = String::with_capacity(1024);
 
     // Front matter
