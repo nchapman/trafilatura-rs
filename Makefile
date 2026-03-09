@@ -87,6 +87,7 @@ SWIFT_SRC_DIR  := $(SWIFT_TEST_DIR)/Sources/TrafilaturaFFI
 .PHONY: build-swift
 build-swift: $(GENERATED_DIR)/swift cargo-build
 	$(call require,swift)
+	mkdir -p $(SWIFT_SRC_DIR)
 	cp $(GENERATED_DIR)/swift/TrafilaturaFFI.h $(SWIFT_SRC_DIR)/
 	cp $(GENERATED_DIR)/swift/TrafilaturaFFI.modulemap $(SWIFT_SRC_DIR)/module.modulemap
 	mkdir -p $(SWIFT_TEST_DIR)/Sources/Trafilatura
