@@ -1,0 +1,148 @@
+name: NuGet
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-native:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            rid: osx-arm64
+            lib: libtrafilatura_uniffi.dylib
+          - os: macos-13
+            target: x86_64-apple-darwin
+            rid: osx-x64
+            lib: libtrafilatura_uniffi.dylib
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            rid: linux-x64
+            lib: libtrafilatura_uniffi.so
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            rid: linux-arm64
+            lib: libtrafilatura_uniffi.so
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            rid: win-x64
+            lib: trafilatura_uniffi.dll
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            rid: win-arm64
+            lib: trafilatura_uniffi.dll
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+          key: ${{ matrix.rid }}
+
+      - name: Install cross-compilation tools
+        if: matrix.rid == 'linux-arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build native library
+        run: cargo build --manifest-path uniffi/Cargo.toml --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.rid == 'linux-arm64' && 'aarch64-linux-gnu-gcc' || '' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: uniffi/target/${{ matrix.target }}/release/${{ matrix.lib }}
+
+  pack:
+    name: Pack & Publish
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      # Download all native libraries from the matrix build
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: nuget/runtimes
+
+      # Rearrange from native-{rid}/{lib} to {rid}/native/{lib}
+      - name: Arrange native libraries
+        run: |
+          cd nuget/runtimes
+          for dir in native-*; do
+            rid="${dir#native-}"
+            mkdir -p "$rid/native"
+            mv "$dir"/* "$rid/native/"
+            rmdir "$dir"
+          done
+          echo "Final layout:"
+          find . -type f
+
+      # Use the linux-x64 native lib from the matrix build for uniffi-bindgen-cs
+      - name: Install uniffi-bindgen-cs
+        run: cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs --tag v0.10.0+v0.29.4
+
+      - name: Generate C# bindings
+        run: |
+          uniffi-bindgen-cs --library nuget/runtimes/linux-x64/native/libtrafilatura_uniffi.so \
+            --out-dir uniffi/generated/cs --config uniffi/uniffi.toml
+          perl -i -pe 's/\bif \(29 != /if (30 != /; s/expected version `29`/expected version `30`/' \
+            uniffi/generated/cs/trafilatura.cs
+
+      # Copy bindings and patch visibility (internal → public) for NuGet consumers
+      - name: Prepare bindings for NuGet
+        run: |
+          cp uniffi/generated/cs/trafilatura.cs nuget/Trafilatura.cs
+          perl -i -pe '
+            s/^internal (static class TrafilaturaMethods)/public $1/;
+            s/^internal (record (ExtractResult|Metadata|ExtractionOptions|ExtractionConfig)\b)/public $1/;
+            s/^internal (enum (ExtractionFocus|HtmlDateMode)\b)/public $1/;
+            s/^internal (class (UniffiException|TrafilaturaException)\b)/public $1/;
+          ' nuget/Trafilatura.cs
+          # Verify the patch worked — expect at least 8 public types
+          patched=$(grep -c '^public' nuget/Trafilatura.cs || true)
+          if [ "$patched" -lt 8 ]; then
+            echo "ERROR: Expected at least 8 public types, got $patched"
+            grep -n '^public\|^internal' nuget/Trafilatura.cs
+            exit 1
+          fi
+          echo "Patched $patched types to public"
+
+      # Derive version from git tag, or use 0.0.0-dev for manual builds
+      - name: Pack NuGet
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          dotnet pack nuget/Trafilatura.csproj -c Release -o nuget/out -p:Version=$VERSION
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: nuget/out/*.nupkg
+
+      - name: Publish to NuGet
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: dotnet nuget push nuget/out/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

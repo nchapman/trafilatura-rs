@@ -182,6 +182,32 @@ build-js: $(GENERATED_DIR)/js
 test-js: build-js
 	cd $(JS_TEST_DIR) && pnpm test
 
+# --- NuGet ---
+
+NUGET_DIR := nuget
+
+.PHONY: build-nuget
+build-nuget: $(GENERATED_DIR)/cs cargo-build
+	$(call require,dotnet)
+	cp $(GENERATED_DIR)/cs/trafilatura.cs $(NUGET_DIR)/Trafilatura.cs
+	@# Patch visibility: internal → public for user-facing API types
+	perl -i -pe '\
+	  s/^internal (static class TrafilaturaMethods)/public $$1/;\
+	  s/^internal (record (ExtractResult|Metadata|ExtractionOptions|ExtractionConfig)\b)/public $$1/;\
+	  s/^internal (enum (ExtractionFocus|HtmlDateMode)\b)/public $$1/;\
+	  s/^internal (class (UniffiException|TrafilaturaException)\b)/public $$1/;\
+	' $(NUGET_DIR)/Trafilatura.cs
+	@# Copy native library for the current platform
+	mkdir -p $(NUGET_DIR)/runtimes
+ifeq ($(UNAME_S),Darwin)
+	mkdir -p $(NUGET_DIR)/runtimes/osx-arm64/native
+	cp $(CDYLIB) $(NUGET_DIR)/runtimes/osx-arm64/native/
+else
+	mkdir -p $(NUGET_DIR)/runtimes/linux-x64/native
+	cp $(CDYLIB) $(NUGET_DIR)/runtimes/linux-x64/native/
+endif
+	dotnet pack $(NUGET_DIR)/Trafilatura.csproj -c Release -o $(NUGET_DIR)/out
+
 # --- Aggregate ---
 
 .PHONY: test-bindings
@@ -196,4 +222,5 @@ clean:
 	rm -rf $(DART_TEST_DIR)/.dart_tool $(DART_TEST_DIR)/pubspec.lock
 	rm -rf $(CS_TEST_DIR)/bin $(CS_TEST_DIR)/obj $(CS_TEST_DIR)/lib
 	rm -rf $(JS_TEST_DIR)/node_modules $(JS_TEST_DIR)/lib
+	rm -rf $(NUGET_DIR)/Trafilatura.cs $(NUGET_DIR)/bin $(NUGET_DIR)/obj $(NUGET_DIR)/runtimes $(NUGET_DIR)/out
 	cd $(UNIFFI_DIR) && $(CARGO) clean
