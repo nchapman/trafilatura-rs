@@ -71,7 +71,7 @@ $(GENERATED_DIR)/js: cargo-build-wasm
 
 $(GENERATED_DIR)/cs: cargo-build
 	$(call require,$(CS_BINDGEN))
-	$(CS_BINDGEN) --library $(CDYLIB) --out-dir $@
+	$(CS_BINDGEN) --library $(CDYLIB) --out-dir $@ --config $(UNIFFI_TOML)
 	@# Patch contract version: uniffi-bindgen-cs v0.10 emits contract 29 (uniffi 0.29)
 	@# but this project uses uniffi 0.31 (contract 30). The ABI is compatible
 	@# because we only use free functions and value types (no callback interfaces).
