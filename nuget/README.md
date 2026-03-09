@@ -16,16 +16,16 @@ dotnet add package Trafilatura
 using Trafilatura;
 
 // Simple extraction
-var result = TrafilaturaMethods.ExtractSimple(html);
+var result = Extractor.ExtractSimple(html);
 Console.WriteLine(result.contentText);
 Console.WriteLine(result.metadata.title);
 
 // With options
-var opts = TrafilaturaMethods.DefaultOptions() with {
+var opts = Extractor.DefaultOptions() with {
     includeLinks = true,
     focus = ExtractionFocus.FavorRecall
 };
-var result = TrafilaturaMethods.Extract(html, opts);
+var result = Extractor.Extract(html, opts);
 ```
 
 ## Supported Platforms

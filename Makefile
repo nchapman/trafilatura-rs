@@ -196,6 +196,7 @@ build-nuget: $(GENERATED_DIR)/cs cargo-build
 	  s/^internal (record (ExtractResult|Metadata|ExtractionOptions|ExtractionConfig)\b)/public $$1/;\
 	  s/^internal (enum (ExtractionFocus|HtmlDateMode)\b)/public $$1/;\
 	  s/^internal (class (UniffiException|TrafilaturaException)\b)/public $$1/;\
+	  s/\bTrafilaturaMethods\b/Extractor/g;\
 	' $(NUGET_DIR)/Trafilatura.cs
 	@# Copy native library for the current platform
 	mkdir -p $(NUGET_DIR)/runtimes
