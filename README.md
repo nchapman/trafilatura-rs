@@ -2,7 +2,8 @@
 
 [![Crates.io](https://img.shields.io/crates/v/trafilatura.svg)](https://crates.io/crates/trafilatura)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust: 1.80+](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust: 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
+[![NuGet](https://img.shields.io/nuget/v/Trafilatura)](https://www.nuget.org/packages/Trafilatura)
 
 Extract readable content, comments, and metadata from web pages.
 
@@ -16,7 +17,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-trafilatura = "0.2"
+trafilatura = "0.3"
 ```
 
 ### Library
@@ -54,7 +55,7 @@ Enable the `markdown` feature to convert extracted content to Markdown:
 
 ```toml
 [dependencies]
-trafilatura = { version = "0.2", features = ["markdown"] }
+trafilatura = { version = "0.3", features = ["markdown"] }
 ```
 
 ```rust
@@ -103,22 +104,16 @@ trafilatura --links https://example.com/article
 
 ## Language bindings
 
-Python, Swift, and Kotlin bindings are available via [UniFFI](https://mozilla.github.io/uniffi-rs/).
+Native bindings are available via [UniFFI](https://mozilla.github.io/uniffi-rs/) for Swift, Kotlin, Ruby, Dart, C#, and JavaScript/TypeScript.
 
 ```sh
 make test-bindings   # run all binding test suites
-make test-python     # Python only (pytest)
 make test-swift      # Swift only (XCTest)
 make test-kotlin     # Kotlin only (JUnit 5)
-```
-
-### Python
-
-```python
-from trafilatura_uniffi import extract_simple
-
-result = extract_simple(html)
-print(result.content_text, result.metadata.title)
+make test-ruby       # Ruby only (Minitest)
+make test-dart       # Dart only
+make test-cs         # C# only (xUnit)
+make test-js         # JS/TS only (Vitest, WASM)
 ```
 
 ### Swift
@@ -133,10 +128,51 @@ print(result.contentText, result.metadata.title)
 ### Kotlin
 
 ```kotlin
-import uniffi.trafilatura_uniffi.*
+import trafilatura.*
 
 val result = extractSimple(html)
 println("${result.contentText} ${result.metadata.title}")
+```
+
+### Ruby
+
+```ruby
+require "trafilatura"
+
+result = Trafilatura.extract_simple(html)
+puts result.content_text, result.metadata.title
+```
+
+### Dart
+
+```dart
+import 'package:trafilatura/trafilatura.dart';
+
+final result = extractSimple(html: html);
+print('${result.contentText} ${result.metadata.title}');
+```
+
+### C# (.NET)
+
+```sh
+dotnet add package Trafilatura
+```
+
+```csharp
+using Trafilatura;
+
+var result = Extractor.ExtractSimple(html);
+Console.WriteLine($"{result.contentText} {result.metadata.title}");
+```
+
+### JavaScript / TypeScript (WASM)
+
+```typescript
+import { Trafilatura } from "./trafilatura.js";
+
+const { extractSimple } = Trafilatura;
+const result = extractSimple(html);
+console.log(result.contentText, result.metadata.title);
 ```
 
 ## Benchmarks
