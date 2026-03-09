@@ -5,7 +5,7 @@
     <PackageId>Trafilatura</PackageId>
     <Version>0.3.0</Version>
     <Authors>Nathaniel Chapman</Authors>
-    <Description>Extract readable content, comments, and metadata from web pages. High-performance Rust-based port of the trafilatura library with native bindings for .NET.</Description>
+    <Description>Extract readable content, comments, and metadata from web pages. High-performance Rust-based implementation with native bindings for .NET.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/nchapman/trafilatura-rs</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

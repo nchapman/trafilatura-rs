@@ -2,7 +2,7 @@
 
 Extract readable content, comments, and metadata from web pages.
 
-A high-performance Rust-based port of the [trafilatura](https://github.com/adbar/trafilatura) library with native bindings for .NET.
+A high-performance Rust-based implementation with native bindings for .NET. See [trafilatura-rs](https://github.com/nchapman/trafilatura-rs) on GitHub.
 
 ## Installation
 
