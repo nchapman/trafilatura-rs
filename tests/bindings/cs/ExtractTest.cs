@@ -1,5 +1,5 @@
 using Xunit;
-using trafilatura;
+using Trafilatura;
 
 namespace TrafilaturaTests;
 

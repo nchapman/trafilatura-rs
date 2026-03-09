@@ -16,5 +16,5 @@ module_name = "trafilatura"
 library_name = "trafilatura_uniffi"
 
 [bindings.csharp]
-namespace = "trafilatura"
+namespace = "Trafilatura"
 cdylib_name = "trafilatura_uniffi"

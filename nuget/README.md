@@ -13,7 +13,7 @@ dotnet add package Trafilatura
 ## Usage
 
 ```csharp
-using trafilatura;
+using Trafilatura;
 
 // Simple extraction
 var result = TrafilaturaMethods.ExtractSimple(html);
