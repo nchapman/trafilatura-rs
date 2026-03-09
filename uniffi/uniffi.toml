@@ -11,6 +11,10 @@ cdylib_name = "trafilatura_uniffi"
 [bindings.ruby]
 cdylib_name = "trafilatura_uniffi"
 
+[bindings.dart]
+module_name = "trafilatura"
+library_name = "trafilatura_uniffi"
+
 [bindings.csharp]
 namespace = "trafilatura"
 cdylib_name = "trafilatura_uniffi"

@@ -46,7 +46,7 @@ $(GENERATED_DIR)/kotlin: cargo-build
 	$(BINDGEN) generate --library $(CDYLIB) --language kotlin --out-dir $@ --config $(UNIFFI_TOML)
 
 $(GENERATED_DIR)/dart: cargo-build
-	$(DART_BINDGEN) generate --library $(CDYLIB) --out-dir $@ --crate trafilatura_uniffi
+	$(DART_BINDGEN) generate --library $(CDYLIB) --out-dir $@ --config $(UNIFFI_TOML)
 
 # --- WASM build ---
 
