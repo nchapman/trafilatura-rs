@@ -73,10 +73,10 @@ pub enum HtmlDateMode {
 /// Advanced tuning parameters.
 #[derive(uniffi::Record)]
 pub struct ExtractionConfig {
-    pub min_extracted_size: i64,
-    pub min_extracted_comment_size: i64,
-    pub min_output_size: i64,
-    pub min_output_comment_size: i64,
+    pub min_extracted_size: i32,
+    pub min_extracted_comment_size: i32,
+    pub min_output_size: i32,
+    pub min_output_comment_size: i32,
 }
 
 /// Extraction options.
@@ -180,10 +180,10 @@ pub fn create_readable_document(result: ExtractResult) -> String {
 
 fn to_ffi_config(c: &trafilatura::Config) -> ExtractionConfig {
     ExtractionConfig {
-        min_extracted_size: c.min_extracted_size as i64,
-        min_extracted_comment_size: c.min_extracted_comment_size as i64,
-        min_output_size: c.min_output_size as i64,
-        min_output_comment_size: c.min_output_comment_size as i64,
+        min_extracted_size: c.min_extracted_size as i32,
+        min_extracted_comment_size: c.min_extracted_comment_size as i32,
+        min_output_size: c.min_output_size as i32,
+        min_output_comment_size: c.min_output_comment_size as i32,
     }
 }
 

@@ -34,14 +34,16 @@ CS_BINDGEN := uniffi-bindgen-cs
 
 GENERATED_DIR := $(UNIFFI_DIR)/generated
 
+UNIFFI_TOML := $(UNIFFI_DIR)/uniffi.toml
+
 $(GENERATED_DIR)/ruby: cargo-build
-	$(BINDGEN) generate --library $(CDYLIB) --language ruby --out-dir $@
+	$(BINDGEN) generate --library $(CDYLIB) --language ruby --out-dir $@ --config $(UNIFFI_TOML)
 
 $(GENERATED_DIR)/swift: cargo-build
-	$(BINDGEN) generate --library $(CDYLIB) --language swift --out-dir $@
+	$(BINDGEN) generate --library $(CDYLIB) --language swift --out-dir $@ --config $(UNIFFI_TOML)
 
 $(GENERATED_DIR)/kotlin: cargo-build
-	$(BINDGEN) generate --library $(CDYLIB) --language kotlin --out-dir $@
+	$(BINDGEN) generate --library $(CDYLIB) --language kotlin --out-dir $@ --config $(UNIFFI_TOML)
 
 $(GENERATED_DIR)/dart: cargo-build
 	$(DART_BINDGEN) generate --library $(CDYLIB) --out-dir $@ --crate trafilatura_uniffi
@@ -73,23 +75,23 @@ $(GENERATED_DIR)/cs: cargo-build
 	@# Patch contract version: uniffi-bindgen-cs v0.10 emits contract 29 (uniffi 0.29)
 	@# but this project uses uniffi 0.31 (contract 30). The ABI is compatible
 	@# because we only use free functions and value types (no callback interfaces).
-	perl -i -pe 's/\bif \(29 != /if (30 != /; s/expected version `29`/expected version `30`/' $@/trafilatura_uniffi.cs
-	@grep -q 'if (30 != ' $@/trafilatura_uniffi.cs || \
+	perl -i -pe 's/\bif \(29 != /if (30 != /; s/expected version `29`/expected version `30`/' $@/trafilatura.cs
+	@grep -q 'if (30 != ' $@/trafilatura.cs || \
 		(echo "ERROR: contract version patch failed — check uniffi-bindgen-cs version" && exit 1)
 
 # --- Swift ---
 
 SWIFT_TEST_DIR := tests/bindings/swift
-SWIFT_SRC_DIR  := $(SWIFT_TEST_DIR)/Sources/trafilatura_uniffiFFI
+SWIFT_SRC_DIR  := $(SWIFT_TEST_DIR)/Sources/TrafilaturaFFI
 
 .PHONY: build-swift
 build-swift: $(GENERATED_DIR)/swift cargo-build
 	$(call require,swift)
-	cp $(GENERATED_DIR)/swift/trafilatura_uniffiFFI.h $(SWIFT_SRC_DIR)/
-	cp $(GENERATED_DIR)/swift/trafilatura_uniffiFFI.modulemap $(SWIFT_SRC_DIR)/module.modulemap
+	cp $(GENERATED_DIR)/swift/TrafilaturaFFI.h $(SWIFT_SRC_DIR)/
+	cp $(GENERATED_DIR)/swift/TrafilaturaFFI.modulemap $(SWIFT_SRC_DIR)/module.modulemap
 	mkdir -p $(SWIFT_TEST_DIR)/Sources/Trafilatura
-	cp $(GENERATED_DIR)/swift/trafilatura_uniffi.swift \
-		$(SWIFT_TEST_DIR)/Sources/Trafilatura/trafilatura_uniffi.swift
+	cp $(GENERATED_DIR)/swift/Trafilatura.swift \
+		$(SWIFT_TEST_DIR)/Sources/Trafilatura/Trafilatura.swift
 
 .PHONY: test-swift
 test-swift: build-swift
@@ -106,8 +108,9 @@ KOTLIN_GEN_DIR  := $(KOTLIN_TEST_DIR)/src/main/kotlin
 .PHONY: build-kotlin
 build-kotlin: $(GENERATED_DIR)/kotlin cargo-build
 	$(call require,java)
+	rm -rf $(KOTLIN_GEN_DIR)/trafilatura
 	mkdir -p $(KOTLIN_GEN_DIR)
-	cp -r $(GENERATED_DIR)/kotlin/uniffi $(KOTLIN_GEN_DIR)/
+	cp -r $(GENERATED_DIR)/kotlin/trafilatura $(KOTLIN_GEN_DIR)/
 
 .PHONY: test-kotlin
 test-kotlin: build-kotlin
@@ -122,7 +125,7 @@ build-ruby: $(GENERATED_DIR)/ruby cargo-build
 	$(call require,ruby)
 	$(call require,bundle)
 	mkdir -p $(RUBY_TEST_DIR)/lib
-	cp $(GENERATED_DIR)/ruby/trafilatura_uniffi.rb $(RUBY_TEST_DIR)/lib/
+	cp $(GENERATED_DIR)/ruby/trafilatura.rb $(RUBY_TEST_DIR)/lib/
 	cd $(RUBY_TEST_DIR) && bundle install
 
 .PHONY: test-ruby
@@ -137,7 +140,7 @@ DART_TEST_DIR := tests/bindings/dart
 build-dart: $(GENERATED_DIR)/dart cargo-build
 	$(call require,dart)
 	mkdir -p $(DART_TEST_DIR)/lib
-	cp $(GENERATED_DIR)/dart/trafilatura_uniffi.dart $(DART_TEST_DIR)/lib/
+	cp $(GENERATED_DIR)/dart/trafilatura.dart $(DART_TEST_DIR)/lib/
 	cd $(DART_TEST_DIR) && dart pub get
 
 .PHONY: test-dart
@@ -152,7 +155,7 @@ CS_TEST_DIR := tests/bindings/cs
 build-cs: $(GENERATED_DIR)/cs cargo-build
 	$(call require,dotnet)
 	mkdir -p $(CS_TEST_DIR)/lib
-	cp $(GENERATED_DIR)/cs/trafilatura_uniffi.cs $(CS_TEST_DIR)/lib/
+	cp $(GENERATED_DIR)/cs/trafilatura.cs $(CS_TEST_DIR)/lib/
 	cd $(CS_TEST_DIR) && dotnet build
 	@# Copy native library next to test binary so DllImport can find it
 	cp $(CDYLIB) $(CS_TEST_DIR)/bin/Debug/net8.0/
@@ -170,8 +173,8 @@ build-js: $(GENERATED_DIR)/js
 	$(call require,node)
 	$(call require,pnpm)
 	mkdir -p $(JS_TEST_DIR)/lib
-	cp $(GENERATED_DIR)/js/trafilatura_uniffi.ts $(JS_TEST_DIR)/lib/
-	cp $(GENERATED_DIR)/js/trafilatura_uniffi.wasm $(JS_TEST_DIR)/lib/
+	cp $(GENERATED_DIR)/js/trafilatura.ts $(JS_TEST_DIR)/lib/
+	cp $(GENERATED_DIR)/js/trafilatura.wasm $(JS_TEST_DIR)/lib/
 	cp $(GENERATED_DIR)/js/uniffi_runtime.ts $(JS_TEST_DIR)/lib/
 	cd $(JS_TEST_DIR) && pnpm install --frozen-lockfile
 

@@ -6,12 +6,12 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .systemLibrary(
-            name: "trafilatura_uniffiFFI",
-            path: "Sources/trafilatura_uniffiFFI"
+            name: "TrafilaturaFFI",
+            path: "Sources/TrafilaturaFFI"
         ),
         .target(
             name: "Trafilatura",
-            dependencies: ["trafilatura_uniffiFFI"],
+            dependencies: ["TrafilaturaFFI"],
             path: "Sources/Trafilatura"
         ),
         .testTarget(

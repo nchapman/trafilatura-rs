@@ -1,5 +1,5 @@
 using Xunit;
-using uniffi.trafilatura_uniffi;
+using uniffi.trafilatura;
 
 namespace TrafilaturaTests;
 
@@ -44,7 +44,7 @@ public class ExtractSimpleTest
     [Fact]
     public void BasicExtraction()
     {
-        var result = TrafilaturaUniffiMethods.ExtractSimple(TestFixtures.ArticleHtml);
+        var result = TrafilaturaMethods.ExtractSimple(TestFixtures.ArticleHtml);
         Assert.Contains("first paragraph", result.contentText);
         Assert.NotEmpty(result.contentText);
     }
@@ -56,24 +56,24 @@ public class ExtractTest
     [Fact]
     public void DefaultOptionsMatchesExtractSimple()
     {
-        var a = TrafilaturaUniffiMethods.ExtractSimple(TestFixtures.ArticleHtml);
-        var b = TrafilaturaUniffiMethods.Extract(TestFixtures.ArticleHtml, TrafilaturaUniffiMethods.DefaultOptions());
+        var a = TrafilaturaMethods.ExtractSimple(TestFixtures.ArticleHtml);
+        var b = TrafilaturaMethods.Extract(TestFixtures.ArticleHtml, TrafilaturaMethods.DefaultOptions());
         Assert.Equal(a.contentText, b.contentText);
     }
 
     [Fact]
     public void WithFocus()
     {
-        var opts = TrafilaturaUniffiMethods.DefaultOptions() with { focus = ExtractionFocus.FavorRecall };
-        var result = TrafilaturaUniffiMethods.Extract(TestFixtures.ArticleHtml, opts);
+        var opts = TrafilaturaMethods.DefaultOptions() with { focus = ExtractionFocus.FavorRecall };
+        var result = TrafilaturaMethods.Extract(TestFixtures.ArticleHtml, opts);
         Assert.NotEmpty(result.contentText);
     }
 
     [Fact]
     public void ExcludeComments()
     {
-        var opts = TrafilaturaUniffiMethods.DefaultOptions() with { excludeComments = true };
-        var result = TrafilaturaUniffiMethods.Extract(TestFixtures.ArticleHtml, opts);
+        var opts = TrafilaturaMethods.DefaultOptions() with { excludeComments = true };
+        var result = TrafilaturaMethods.Extract(TestFixtures.ArticleHtml, opts);
         Assert.Equal("", result.commentsText);
     }
 }
@@ -84,25 +84,25 @@ public class ValidationTest
     [Fact]
     public void ValidUrl()
     {
-        var opts = TrafilaturaUniffiMethods.DefaultOptions() with { originalUrl = "https://example.com/article" };
-        var result = TrafilaturaUniffiMethods.Extract(TestFixtures.ArticleHtml, opts);
+        var opts = TrafilaturaMethods.DefaultOptions() with { originalUrl = "https://example.com/article" };
+        var result = TrafilaturaMethods.Extract(TestFixtures.ArticleHtml, opts);
         Assert.NotEmpty(result.contentText);
     }
 
     [Fact]
     public void InvalidUrlThrowsParseError()
     {
-        var opts = TrafilaturaUniffiMethods.DefaultOptions() with { originalUrl = "not a url" };
+        var opts = TrafilaturaMethods.DefaultOptions() with { originalUrl = "not a url" };
         Assert.Throws<TrafilaturaException.ParseException>(() =>
-            TrafilaturaUniffiMethods.Extract(TestFixtures.ArticleHtml, opts));
+            TrafilaturaMethods.Extract(TestFixtures.ArticleHtml, opts));
     }
 
     [Fact]
     public void InvalidDateThrowsParseError()
     {
-        var opts = TrafilaturaUniffiMethods.DefaultOptions() with { htmlDateOverride = "01/01/2024" };
+        var opts = TrafilaturaMethods.DefaultOptions() with { htmlDateOverride = "01/01/2024" };
         Assert.Throws<TrafilaturaException.ParseException>(() =>
-            TrafilaturaUniffiMethods.Extract(TestFixtures.ArticleHtml, opts));
+            TrafilaturaMethods.Extract(TestFixtures.ArticleHtml, opts));
     }
 }
 
@@ -112,7 +112,7 @@ public class MetadataTest
     [Fact]
     public void MetadataExtraction()
     {
-        var result = TrafilaturaUniffiMethods.ExtractSimple(TestFixtures.ArticleHtml);
+        var result = TrafilaturaMethods.ExtractSimple(TestFixtures.ArticleHtml);
         Assert.Equal("Test Article Title", result.metadata.title);
     }
 }
@@ -123,7 +123,7 @@ public class HtmlOutputTest
     [Fact]
     public void ContentHtmlPresent()
     {
-        var result = TrafilaturaUniffiMethods.ExtractSimple(TestFixtures.ArticleHtml);
+        var result = TrafilaturaMethods.ExtractSimple(TestFixtures.ArticleHtml);
         Assert.NotEmpty(result.contentHtml);
         Assert.Contains("<", result.contentHtml);
     }
@@ -135,8 +135,8 @@ public class ReadableDocumentTest
     [Fact]
     public void CreateReadableDocument()
     {
-        var result = TrafilaturaUniffiMethods.ExtractSimple(TestFixtures.ArticleHtml);
-        var doc = TrafilaturaUniffiMethods.CreateReadableDocument(result);
+        var result = TrafilaturaMethods.ExtractSimple(TestFixtures.ArticleHtml);
+        var doc = TrafilaturaMethods.CreateReadableDocument(result);
         Assert.Contains("<html", doc);
         Assert.Contains("content-body", doc);
     }
@@ -147,7 +147,7 @@ public class DefaultOptionsTest
     [Fact]
     public void DefaultOptionValues()
     {
-        var opts = TrafilaturaUniffiMethods.DefaultOptions();
+        var opts = TrafilaturaMethods.DefaultOptions();
         Assert.Null(opts.originalUrl);
         Assert.Null(opts.targetLanguage);
         Assert.False(opts.enableFallback);
@@ -170,10 +170,10 @@ public class DefaultConfigTest
     [Fact]
     public void DefaultConfigValues()
     {
-        var config = TrafilaturaUniffiMethods.DefaultConfig();
-        Assert.Equal(250L, config.minExtractedSize);
-        Assert.Equal(1L, config.minExtractedCommentSize);
-        Assert.Equal(1L, config.minOutputSize);
-        Assert.Equal(1L, config.minOutputCommentSize);
+        var config = TrafilaturaMethods.DefaultConfig();
+        Assert.Equal(250, config.minExtractedSize);
+        Assert.Equal(1, config.minExtractedCommentSize);
+        Assert.Equal(1, config.minOutputSize);
+        Assert.Equal(1, config.minOutputCommentSize);
     }
 }

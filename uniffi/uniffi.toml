@@ -1,8 +1,12 @@
-[bindings.kotlin]
-package_name = "uniffi.trafilatura_uniffi"
-cdylib_name  = "trafilatura_uniffi"
-
 [bindings.swift]
-module_name  = "Trafilatura"
-ffi_module_name = "trafilatura_uniffiFFI"
-cdylib_name  = "trafilatura_uniffi"
+module_name = "Trafilatura"
+ffi_module_name = "TrafilaturaFFI"
+ffi_module_filename = "TrafilaturaFFI"
+cdylib_name = "trafilatura_uniffi"
+
+[bindings.kotlin]
+package_name = "trafilatura"
+cdylib_name = "trafilatura_uniffi"
+
+[bindings.ruby]
+cdylib_name = "trafilatura_uniffi"

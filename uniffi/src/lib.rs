@@ -1,3 +1,3 @@
-uniffi::setup_scaffolding!("trafilatura_uniffi");
+uniffi::setup_scaffolding!("trafilatura");
 
 include!("exports.rs");

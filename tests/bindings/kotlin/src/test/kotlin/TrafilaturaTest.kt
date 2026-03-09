@@ -1,4 +1,4 @@
-import uniffi.trafilatura_uniffi.*
+import trafilatura.*
 import kotlin.test.*
 import org.junit.jupiter.api.Nested
 
@@ -144,10 +144,10 @@ class TrafilaturaTest {
         @Test fun `default config values`() {
             // Defaults from trafilatura::Config::default()
             val config = defaultConfig()
-            assertEquals(250L, config.minExtractedSize)
-            assertEquals(1L, config.minExtractedCommentSize)
-            assertEquals(1L, config.minOutputSize)
-            assertEquals(1L, config.minOutputCommentSize)
+            assertEquals(250, config.minExtractedSize)
+            assertEquals(1, config.minExtractedCommentSize)
+            assertEquals(1, config.minOutputSize)
+            assertEquals(1, config.minOutputCommentSize)
         }
     }
 }

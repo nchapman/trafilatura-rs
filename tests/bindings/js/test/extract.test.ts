@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  TrafilaturaUniffi,
+  Trafilatura,
   TrafilaturaError,
   type ExtractionFocus,
   type HtmlDateMode,
-} from '../lib/trafilatura_uniffi.js';
+} from '../lib/trafilatura.js';
 
 const {
   extractSimple,
@@ -12,7 +12,7 @@ const {
   defaultOptions,
   defaultConfig,
   createReadableDocument,
-} = TrafilaturaUniffi;
+} = Trafilatura;
 
 const articleHtml = `
 <html>
@@ -158,9 +158,9 @@ describe('defaultOptions', () => {
 describe('defaultConfig', () => {
   it('default config values', () => {
     const config = defaultConfig();
-    expect(config.minExtractedSize).toBe(250n);
-    expect(config.minExtractedCommentSize).toBe(1n);
-    expect(config.minOutputSize).toBe(1n);
-    expect(config.minOutputCommentSize).toBe(1n);
+    expect(config.minExtractedSize).toBe(250);
+    expect(config.minExtractedCommentSize).toBe(1);
+    expect(config.minOutputSize).toBe(1);
+    expect(config.minOutputCommentSize).toBe(1);
   });
 });

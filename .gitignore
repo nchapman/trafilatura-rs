@@ -5,10 +5,21 @@ __pycache__/
 
 # Dart
 .dart_tool/
+tests/bindings/dart/lib/
 
 # JS
 node_modules/
 tests/bindings/js/lib/
+
+# Ruby
+tests/bindings/ruby/lib/
+
+# Kotlin (generated bindings)
+tests/bindings/kotlin/src/main/kotlin/trafilatura/
+
+# Swift (generated bindings)
+tests/bindings/swift/Sources/Trafilatura/
+tests/bindings/swift/Sources/TrafilaturaFFI/
 
 # C#
 **/bin/Debug/

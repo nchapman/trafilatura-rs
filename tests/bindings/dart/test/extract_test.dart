@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:test/test.dart';
-import 'package:trafilatura_dart_test/trafilatura_uniffi.dart';
+import 'package:trafilatura_dart_test/trafilatura.dart';
 
 const articleHtml = '''
 <html>
