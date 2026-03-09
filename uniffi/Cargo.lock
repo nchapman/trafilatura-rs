@@ -1528,6 +1528,8 @@ dependencies = [
 [[package]]
 name = "uniffi-bindgen-js"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea537b29b69aefd81d15f9e8ccdbaef8b316a97d4c0cc32edeb8c6a0cdda1aed"
 dependencies = [
  "anyhow",
  "camino",
