@@ -86,6 +86,8 @@ jobs:
           cargo run --manifest-path uniffi/Cargo.toml --features cli --bin uniffi-bindgen -- \
             generate --library uniffi/target/release/libtrafilatura_uniffi.so \
             --language kotlin --out-dir uniffi/generated/kotlin --config uniffi/uniffi.toml
+          echo "=== Generated Kotlin files ==="
+          find uniffi/generated/kotlin -type f
 
       # Place native libs and generated Kotlin into the android project
       - name: Assemble Android project
@@ -98,8 +100,8 @@ jobs:
           done
 
           # Copy generated Kotlin bindings
-          mkdir -p android/src/main/kotlin
-          cp -r uniffi/generated/kotlin/trafilatura android/src/main/kotlin/
+          mkdir -p android/src/main/kotlin/trafilatura
+          find uniffi/generated/kotlin -name '*.kt' -exec cp {} android/src/main/kotlin/trafilatura/ \;
 
           # Verify
           echo "=== jniLibs layout ==="
