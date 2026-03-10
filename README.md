@@ -116,11 +116,11 @@ make test-cs         # C# only (xUnit)
 make test-js         # JS/TS only (Vitest, WASM)
 ```
 
-### Swift
+### Swift ([full API docs](swift/README.md))
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/nchapman/trafilatura-swift", from: "0.3.0"),
+.package(url: "https://github.com/nchapman/trafilatura-swift", from: "0.3.5"),
 ```
 
 ```swift
@@ -130,11 +130,11 @@ let result = try extractSimple(html: html)
 print(result.contentText, result.metadata.title)
 ```
 
-### Kotlin / Android
+### Kotlin / Android ([full API docs](android/README.md))
 
 ```kotlin
 // build.gradle.kts
-implementation("io.github.nchapman:trafilatura:0.3.4")
+implementation("io.github.nchapman:trafilatura:0.3.5")
 ```
 
 ```kotlin
@@ -162,7 +162,7 @@ final result = extractSimple(html: html);
 print('${result.contentText} ${result.metadata.title}');
 ```
 
-### C# (.NET)
+### C# (.NET) ([full API docs](nuget/README.md))
 
 ```sh
 dotnet add package Trafilatura
