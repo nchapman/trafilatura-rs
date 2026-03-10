@@ -259,6 +259,27 @@ else
 endif
 	dotnet pack $(NUGET_DIR)/Trafilatura.csproj -c Release -o $(NUGET_DIR)/out
 
+# --- Android AAR (local) ---
+
+ANDROID_DIR     := android
+ANDROID_ABIS    := arm64-v8a armeabi-v7a x86_64
+ANDROID_TARGETS := aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+
+.PHONY: build-aar
+build-aar: $(GENERATED_DIR)/kotlin cargo-build
+	$(call require,cargo-ndk)
+	@# Build all Android ABIs
+	cargo ndk --manifest-path $(UNIFFI_DIR)/Cargo.toml \
+		-t arm64-v8a -t armeabi-v7a -t x86_64 \
+		-o $(ANDROID_DIR)/src/main/jniLibs \
+		build --release
+	@# Copy generated Kotlin bindings
+	mkdir -p $(ANDROID_DIR)/src/main/kotlin
+	cp -r $(GENERATED_DIR)/kotlin/trafilatura $(ANDROID_DIR)/src/main/kotlin/
+	@# Build AAR
+	cd $(ANDROID_DIR) && ./gradlew assembleRelease
+	@echo "AAR built at $(ANDROID_DIR)/build/outputs/aar/"
+
 # --- Aggregate ---
 
 .PHONY: test-bindings
@@ -275,4 +296,5 @@ clean:
 	rm -rf $(JS_TEST_DIR)/node_modules $(JS_TEST_DIR)/lib
 	rm -rf $(NUGET_DIR)/Trafilatura.cs $(NUGET_DIR)/bin $(NUGET_DIR)/obj $(NUGET_DIR)/runtimes $(NUGET_DIR)/out
 	rm -rf swift/universal swift/headers swift/TrafilaturaFFI.xcframework swift/TrafilaturaFFI.xcframework.zip
+	rm -rf $(ANDROID_DIR)/build $(ANDROID_DIR)/src/main/jniLibs $(ANDROID_DIR)/src/main/kotlin/trafilatura $(ANDROID_DIR)/.gradle
 	cd $(UNIFFI_DIR) && $(CARGO) clean

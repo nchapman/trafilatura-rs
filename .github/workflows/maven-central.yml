@@ -1,0 +1,156 @@
+name: Maven Central
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-native:
+    name: Build ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+          - abi: x86_64
+            target: x86_64-linux-android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+          key: android-${{ matrix.abi }}
+
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27c
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      - name: Build native library
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cargo ndk --manifest-path uniffi/Cargo.toml \
+            -t ${{ matrix.abi }} \
+            -o output/jniLibs \
+            build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}
+          path: output/jniLibs/${{ matrix.abi }}/libtrafilatura_uniffi.so
+
+  publish:
+    name: Assemble & Publish
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Download all native libraries
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: android-*
+          path: artifacts
+
+      # Generate Kotlin bindings (need host .so for uniffi-bindgen)
+      - name: Generate Kotlin bindings
+        run: |
+          cargo build --manifest-path uniffi/Cargo.toml --release
+          cargo run --manifest-path uniffi/Cargo.toml --features cli --bin uniffi-bindgen -- \
+            generate --library uniffi/target/release/libtrafilatura_uniffi.so \
+            --language kotlin --out-dir uniffi/generated/kotlin --config uniffi/uniffi.toml
+
+      # Place native libs and generated Kotlin into the android project
+      - name: Assemble Android project
+        run: |
+          # Copy native libraries
+          for dir in artifacts/android-*; do
+            abi="${dir#artifacts/android-}"
+            mkdir -p android/src/main/jniLibs/$abi
+            cp "$dir"/libtrafilatura_uniffi.so android/src/main/jniLibs/$abi/
+          done
+
+          # Copy generated Kotlin bindings
+          mkdir -p android/src/main/kotlin
+          cp -r uniffi/generated/kotlin/trafilatura android/src/main/kotlin/
+
+          # Verify
+          echo "=== jniLibs layout ==="
+          find android/src/main/jniLibs -type f
+          echo "=== Kotlin sources ==="
+          find android/src/main/kotlin -type f
+
+      # Determine version
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Build AAR
+      - name: Build AAR
+        working-directory: android
+        run: ./gradlew assembleRelease -PVERSION=${{ steps.version.outputs.version }}
+
+      # Verify AAR contents
+      - name: Verify AAR
+        run: |
+          AAR=$(find android/build/outputs/aar -name '*.aar' | head -1)
+          echo "AAR: $AAR"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            SIZE=$(unzip -p "$AAR" "jni/$abi/libtrafilatura_uniffi.so" | wc -c | tr -d ' ')
+            if [ "$SIZE" -lt 10000 ]; then
+              echo "ERROR: $abi .so is missing or too small ($SIZE bytes)"
+              exit 1
+            fi
+            echo "$abi: $SIZE bytes OK"
+          done
+          echo "All 3 ABIs present and valid"
+
+      # Upload AAR as artifact for non-tag runs
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: trafilatura-aar
+          path: android/build/outputs/aar/*.aar
+
+      # Publish to Maven Central
+      - name: Publish to Maven Central
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+        run: ./gradlew publishAndReleaseToMavenCentral -PVERSION=${{ steps.version.outputs.version }}

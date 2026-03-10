@@ -130,7 +130,12 @@ let result = try extractSimple(html: html)
 print(result.contentText, result.metadata.title)
 ```
 
-### Kotlin
+### Kotlin / Android
+
+```kotlin
+// build.gradle.kts
+implementation("io.github.nchapman:trafilatura:0.3.4")
+```
 
 ```kotlin
 import trafilatura.*
