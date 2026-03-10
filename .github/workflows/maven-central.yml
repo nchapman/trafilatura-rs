@@ -88,6 +88,11 @@ jobs:
             --language kotlin --out-dir uniffi/generated/kotlin --config uniffi/uniffi.toml
           echo "=== Generated Kotlin files ==="
           find uniffi/generated/kotlin -type f
+          # Fail fast if bindgen produced nothing
+          if ! find uniffi/generated/kotlin -name '*.kt' | grep -q .; then
+            echo "ERROR: No Kotlin files generated — uniffi-bindgen found no components"
+            exit 1
+          fi
 
       # Place native libs and generated Kotlin into the android project
       - name: Assemble Android project
@@ -108,6 +113,10 @@ jobs:
           find android/src/main/jniLibs -type f
           echo "=== Kotlin sources ==="
           find android/src/main/kotlin -type f
+          if ! find android/src/main/kotlin -name '*.kt' | grep -q .; then
+            echo "ERROR: No Kotlin sources in android project"
+            exit 1
+          fi
 
       # Determine version
       - name: Determine version
