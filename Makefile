@@ -280,6 +280,28 @@ build-aar: $(GENERATED_DIR)/kotlin cargo-build
 	cd $(ANDROID_DIR) && ./gradlew assembleRelease
 	@echo "AAR built at $(ANDROID_DIR)/build/outputs/aar/"
 
+# --- RubyGem ---
+
+GEM_DIR := gem
+
+.PHONY: build-gem
+build-gem: $(GENERATED_DIR)/ruby cargo-build
+	$(call require,ruby)
+	$(call require,gem)
+	cp $(GENERATED_DIR)/ruby/trafilatura.rb $(GEM_DIR)/lib/trafilatura/trafilatura_generated.rb
+	cp $(CDYLIB) $(GEM_DIR)/lib/trafilatura/
+	@# Patch ffi_lib to load bundled native library
+ifeq ($(UNAME_S),Darwin)
+	perl -i -pe "s|ffi_lib ['\"]trafilatura_uniffi['\"]|ffi_lib File.join(__dir__, 'libtrafilatura_uniffi.dylib')|" \
+		$(GEM_DIR)/lib/trafilatura/trafilatura_generated.rb
+else
+	perl -i -pe "s|ffi_lib ['\"]trafilatura_uniffi['\"]|ffi_lib File.join(__dir__, 'libtrafilatura_uniffi.so')|" \
+		$(GEM_DIR)/lib/trafilatura/trafilatura_generated.rb
+endif
+	@grep -q 'File.join(__dir__' $(GEM_DIR)/lib/trafilatura/trafilatura_generated.rb || \
+		(echo "ERROR: ffi_lib patch failed" && exit 1)
+	cd $(GEM_DIR) && gem build trafilatura.gemspec
+
 # --- Aggregate ---
 
 .PHONY: test-bindings
@@ -297,4 +319,5 @@ clean:
 	rm -rf $(NUGET_DIR)/Trafilatura.cs $(NUGET_DIR)/bin $(NUGET_DIR)/obj $(NUGET_DIR)/runtimes $(NUGET_DIR)/out
 	rm -rf swift/universal swift/headers swift/TrafilaturaFFI.xcframework swift/TrafilaturaFFI.xcframework.zip
 	rm -rf $(ANDROID_DIR)/build $(ANDROID_DIR)/src/main/jniLibs $(ANDROID_DIR)/src/main/kotlin/trafilatura $(ANDROID_DIR)/.gradle
+	rm -rf $(GEM_DIR)/lib/trafilatura/trafilatura_generated.rb $(GEM_DIR)/lib/trafilatura/libtrafilatura_uniffi.* $(GEM_DIR)/*.gem
 	cd $(UNIFFI_DIR) && $(CARGO) clean

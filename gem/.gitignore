@@ -1,0 +1,3 @@
+lib/trafilatura/trafilatura_generated.rb
+lib/trafilatura/libtrafilatura_uniffi.*
+*.gem

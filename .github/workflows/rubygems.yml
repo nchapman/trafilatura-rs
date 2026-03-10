@@ -1,0 +1,169 @@
+name: RubyGems
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-native:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: x86_64-linux
+            lib: libtrafilatura_uniffi.so
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            platform: aarch64-linux
+            lib: libtrafilatura_uniffi.so
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: x86_64-darwin
+            lib: libtrafilatura_uniffi.dylib
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: arm64-darwin
+            lib: libtrafilatura_uniffi.dylib
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+          key: ${{ matrix.platform }}
+
+      - name: Install cross-compilation tools
+        if: matrix.platform == 'aarch64-linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build native library
+        run: cargo build --manifest-path uniffi/Cargo.toml --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.platform == 'aarch64-linux' && 'aarch64-linux-gnu-gcc' || '' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: uniffi/target/${{ matrix.target }}/release/${{ matrix.lib }}
+
+  publish:
+    name: Package & Publish
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+          key: rubygems-publish
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
+      # Download all native libraries
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: natives
+
+      # Generate Ruby bindings (use downloaded linux-x64 lib for uniffi-bindgen)
+      - name: Generate Ruby bindings
+        run: |
+          cargo build --manifest-path uniffi/Cargo.toml --features cli --bin uniffi-bindgen
+          cargo run --manifest-path uniffi/Cargo.toml --features cli --bin uniffi-bindgen -- \
+            generate --library natives/native-x86_64-linux/libtrafilatura_uniffi.so \
+            --language ruby --out-dir uniffi/generated/ruby --config uniffi/uniffi.toml
+          if ! find uniffi/generated/ruby -name '*.rb' | grep -q .; then
+            echo "ERROR: No Ruby files generated"
+            exit 1
+          fi
+
+      # Determine version
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Package a gem for each platform
+      - name: Package gems
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
+
+          for platform in x86_64-linux aarch64-linux x86_64-darwin arm64-darwin; do
+            echo "=== Packaging $platform ==="
+            work="work-$platform"
+            cp -r gem "$work"
+
+            # Copy generated bindings and LICENSE
+            cp uniffi/generated/ruby/trafilatura.rb "$work/lib/trafilatura/trafilatura_generated.rb"
+            cp LICENSE "$work/"
+
+            # Determine library filename
+            case "$platform" in
+              *darwin*) libfile="libtrafilatura_uniffi.dylib" ;;
+              *linux*)  libfile="libtrafilatura_uniffi.so" ;;
+            esac
+
+            # Copy native lib
+            cp "natives/native-$platform/$libfile" "$work/lib/trafilatura/"
+
+            # Patch ffi_lib to load bundled native library
+            perl -i -pe "s|ffi_lib ['\"]trafilatura_uniffi['\"]|ffi_lib File.join(__dir__, '$libfile')|" \
+              "$work/lib/trafilatura/trafilatura_generated.rb"
+            grep -q "File.join(__dir__" "$work/lib/trafilatura/trafilatura_generated.rb" || \
+              { echo "ERROR: ffi_lib patch failed for $platform"; exit 1; }
+
+            # Stamp version
+            perl -i -pe "s|VERSION = \"0.0.0\"|VERSION = \"$VERSION\"|" "$work/lib/trafilatura/version.rb"
+
+            # Build gem
+            cd "$work"
+            GEM_PLATFORM="$platform" gem build trafilatura.gemspec
+            cp *.gem ../dist/
+            cd ..
+
+            echo "$platform: OK"
+          done
+
+          echo "=== Built gems ==="
+          ls -la dist/
+
+      # Upload gems as artifacts for non-tag runs
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: trafilatura-gems
+          path: dist/*.gem
+
+      # Publish to RubyGems
+      - name: Publish to RubyGems
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p ~/.gem
+          echo "---" > ~/.gem/credentials
+          echo ":rubygems_api_key: ${{ secrets.RUBYGEMS_API_KEY }}" >> ~/.gem/credentials
+          chmod 0600 ~/.gem/credentials
+          for f in dist/*.gem; do
+            echo "Publishing $f..."
+            gem push "$f"
+          done

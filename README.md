@@ -144,7 +144,11 @@ val result = extractSimple(html)
 println("${result.contentText} ${result.metadata.title}")
 ```
 
-### Ruby
+### Ruby ([full API docs](gem/README.md))
+
+```sh
+gem install trafilatura
+```
 
 ```ruby
 require "trafilatura"
