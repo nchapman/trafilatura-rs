@@ -1,0 +1,6 @@
+.build/
+Sources/Trafilatura/Trafilatura.swift
+TrafilaturaFFI.xcframework/
+TrafilaturaFFI.xcframework.zip
+universal/
+headers/

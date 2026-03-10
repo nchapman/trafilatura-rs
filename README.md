@@ -119,6 +119,11 @@ make test-js         # JS/TS only (Vitest, WASM)
 ### Swift
 
 ```swift
+// Package.swift
+.package(url: "https://github.com/nchapman/trafilatura-swift", from: "0.3.0"),
+```
+
+```swift
 import Trafilatura
 
 let result = try extractSimple(html: html)

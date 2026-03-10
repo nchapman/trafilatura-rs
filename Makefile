@@ -183,6 +183,55 @@ build-js: $(GENERATED_DIR)/js
 test-js: build-js
 	cd $(JS_TEST_DIR) && pnpm test
 
+# --- XCFramework (local) ---
+
+APPLE_TARGETS := aarch64-apple-darwin x86_64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+.PHONY: build-xcframework
+build-xcframework: $(GENERATED_DIR)/swift
+	$(call require,xcodebuild)
+	$(call require,lipo)
+	@# Build all Apple targets
+	@for target in $(APPLE_TARGETS); do \
+		echo "Building $$target..."; \
+		$(CARGO) build --manifest-path $(UNIFFI_DIR)/Cargo.toml --release --target $$target; \
+	done
+	@# Create universal macOS binary (arm64 + x64)
+	mkdir -p swift/universal
+	lipo -create \
+		$(TARGET_DIR)/aarch64-apple-darwin/release/libtrafilatura_uniffi.a \
+		$(TARGET_DIR)/x86_64-apple-darwin/release/libtrafilatura_uniffi.a \
+		-output swift/universal/libtrafilatura_uniffi-macos.a
+	@# Create universal iOS Simulator binary (arm64 + x64)
+	lipo -create \
+		$(TARGET_DIR)/aarch64-apple-ios-sim/release/libtrafilatura_uniffi.a \
+		$(TARGET_DIR)/x86_64-apple-ios/release/libtrafilatura_uniffi.a \
+		-output swift/universal/libtrafilatura_uniffi-ios-sim.a
+	@# iOS device is single-arch
+	cp $(TARGET_DIR)/aarch64-apple-ios/release/libtrafilatura_uniffi.a \
+		swift/universal/libtrafilatura_uniffi-ios.a
+	@# Strip debug symbols
+	strip -S swift/universal/libtrafilatura_uniffi-macos.a
+	strip -S swift/universal/libtrafilatura_uniffi-ios-sim.a
+	strip -S swift/universal/libtrafilatura_uniffi-ios.a
+	@# Prepare headers
+	mkdir -p swift/headers
+	cp $(GENERATED_DIR)/swift/TrafilaturaFFI.h swift/headers/
+	cp $(GENERATED_DIR)/swift/TrafilaturaFFI.modulemap swift/headers/module.modulemap
+	@# Assemble XCFramework
+	rm -rf swift/TrafilaturaFFI.xcframework
+	xcodebuild -create-xcframework \
+		-library swift/universal/libtrafilatura_uniffi-macos.a \
+		-headers swift/headers \
+		-library swift/universal/libtrafilatura_uniffi-ios.a \
+		-headers swift/headers \
+		-library swift/universal/libtrafilatura_uniffi-ios-sim.a \
+		-headers swift/headers \
+		-output swift/TrafilaturaFFI.xcframework
+	@# Copy generated Swift source
+	cp $(GENERATED_DIR)/swift/Trafilatura.swift swift/Sources/Trafilatura/
+	@echo "XCFramework built at swift/TrafilaturaFFI.xcframework"
+
 # --- NuGet ---
 
 NUGET_DIR := nuget
@@ -225,4 +274,5 @@ clean:
 	rm -rf $(CS_TEST_DIR)/bin $(CS_TEST_DIR)/obj $(CS_TEST_DIR)/lib
 	rm -rf $(JS_TEST_DIR)/node_modules $(JS_TEST_DIR)/lib
 	rm -rf $(NUGET_DIR)/Trafilatura.cs $(NUGET_DIR)/bin $(NUGET_DIR)/obj $(NUGET_DIR)/runtimes $(NUGET_DIR)/out
+	rm -rf swift/universal swift/headers swift/TrafilaturaFFI.xcframework swift/TrafilaturaFFI.xcframework.zip
 	cd $(UNIFFI_DIR) && $(CARGO) clean

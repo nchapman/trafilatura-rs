@@ -1,0 +1,228 @@
+name: Swift Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-native:
+    name: Build ${{ matrix.label }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - label: macos-arm64
+            target: aarch64-apple-darwin
+          - label: macos-x64
+            target: x86_64-apple-darwin
+          - label: ios-arm64
+            target: aarch64-apple-ios
+          - label: ios-sim-arm64
+            target: aarch64-apple-ios-sim
+          - label: ios-sim-x64
+            target: x86_64-apple-ios
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+          key: swift-${{ matrix.label }}
+
+      - name: Build static library
+        run: cargo build --manifest-path uniffi/Cargo.toml --release --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swift-${{ matrix.label }}
+          path: uniffi/target/${{ matrix.target }}/release/libtrafilatura_uniffi.a
+
+  package:
+    name: Package & Publish
+    needs: build-native
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: uniffi/
+
+      # Download all native libraries
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: swift-*
+          path: artifacts
+
+      # Generate Swift bindings (need the host dylib for uniffi-bindgen)
+      - name: Generate Swift bindings
+        run: |
+          cargo build --manifest-path uniffi/Cargo.toml --release
+          cargo run --manifest-path uniffi/Cargo.toml --features cli --bin uniffi-bindgen -- \
+            generate --library uniffi/target/release/libtrafilatura_uniffi.dylib \
+            --language swift --out-dir uniffi/generated/swift --config uniffi/uniffi.toml
+
+      # Prepare headers directory
+      - name: Prepare headers
+        run: |
+          mkdir -p headers
+          cp uniffi/generated/swift/TrafilaturaFFI.h headers/
+          cp uniffi/generated/swift/TrafilaturaFFI.modulemap headers/module.modulemap
+
+      # Create fat binaries with lipo
+      - name: Create universal binaries
+        run: |
+          mkdir -p universal
+
+          # macOS universal (arm64 + x64)
+          lipo -create \
+            artifacts/swift-macos-arm64/libtrafilatura_uniffi.a \
+            artifacts/swift-macos-x64/libtrafilatura_uniffi.a \
+            -output universal/libtrafilatura_uniffi-macos.a
+
+          # iOS Simulator universal (arm64 + x64)
+          lipo -create \
+            artifacts/swift-ios-sim-arm64/libtrafilatura_uniffi.a \
+            artifacts/swift-ios-sim-x64/libtrafilatura_uniffi.a \
+            -output universal/libtrafilatura_uniffi-ios-sim.a
+
+          # iOS device is single-arch
+          cp artifacts/swift-ios-arm64/libtrafilatura_uniffi.a \
+            universal/libtrafilatura_uniffi-ios.a
+
+          # Verify architectures
+          lipo -info universal/libtrafilatura_uniffi-macos.a | grep -q "x86_64 arm64"
+          lipo -info universal/libtrafilatura_uniffi-ios-sim.a | grep -q "x86_64 arm64"
+
+      # Strip debug symbols to reduce binary size
+      - name: Strip libraries
+        run: |
+          strip -S universal/libtrafilatura_uniffi-macos.a
+          strip -S universal/libtrafilatura_uniffi-ios-sim.a
+          strip -S universal/libtrafilatura_uniffi-ios.a
+
+      # Assemble XCFramework
+      - name: Create XCFramework
+        run: |
+          rm -rf TrafilaturaFFI.xcframework
+          xcodebuild -create-xcframework \
+            -library universal/libtrafilatura_uniffi-macos.a \
+            -headers headers \
+            -library universal/libtrafilatura_uniffi-ios.a \
+            -headers headers \
+            -library universal/libtrafilatura_uniffi-ios-sim.a \
+            -headers headers \
+            -output TrafilaturaFFI.xcframework
+
+      # Package and compute checksum
+      - name: Package XCFramework
+        id: xcframework
+        run: |
+          zip -r TrafilaturaFFI.xcframework.zip TrafilaturaFFI.xcframework
+          CHECKSUM=$(swift package compute-checksum TrafilaturaFFI.xcframework.zip)
+          if [[ ! "$CHECKSUM" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "Invalid checksum: $CHECKSUM"
+            exit 1
+          fi
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "Checksum: $CHECKSUM"
+
+      # Derive version from tag
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Upload XCFramework as artifact for non-tag runs (for local verification)
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: TrafilaturaFFI.xcframework.zip
+          path: TrafilaturaFFI.xcframework.zip
+
+      # Upload XCFramework to GitHub Releases
+      - name: Upload to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create release (tolerate "already exists" for re-runs)
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --repo "$GITHUB_REPOSITORY" 2>&1 || {
+            if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "Release already exists, continuing..."
+            else
+              echo "Failed to create release"
+              exit 1
+            fi
+          }
+          # Upload asset
+          gh release upload "$GITHUB_REF_NAME" TrafilaturaFFI.xcframework.zip \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+      # Verify the binary is downloadable before publishing the package
+      - name: Verify download URL
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/TrafilaturaFFI.xcframework.zip"
+          HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" "$URL")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Binary not accessible at $URL (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      # Prepare and push to distribution repo
+      - name: Publish to trafilatura-swift
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DEPLOY_KEY: ${{ secrets.SWIFT_DEPLOY_KEY }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHECKSUM="${{ steps.xcframework.outputs.checksum }}"
+
+          # Stamp Package.swift with version and checksum
+          sed -e "s|<VERSION>|$VERSION|g" -e "s|<SHA256>|$CHECKSUM|g" \
+            swift/Package.swift > Package.swift.stamped
+          grep -q "v$VERSION" Package.swift.stamped || { echo "Version stamping failed"; exit 1; }
+          grep -q "$CHECKSUM" Package.swift.stamped || { echo "Checksum stamping failed"; exit 1; }
+
+          # Set up SSH for deploy key
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key"
+
+          # Clone the distribution repo
+          git clone git@github.com:nchapman/trafilatura-swift.git dist-repo
+
+          # Copy files
+          cp Package.swift.stamped dist-repo/Package.swift
+          mkdir -p dist-repo/Sources/Trafilatura
+          cp uniffi/generated/swift/Trafilatura.swift dist-repo/Sources/Trafilatura/
+          cp swift/README.md dist-repo/README.md
+          cp LICENSE dist-repo/LICENSE
+
+          # Commit and push
+          cd dist-repo
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Release v$VERSION"
+          git tag -f "v$VERSION"
+          git push origin main
+          git push origin "v$VERSION" --force
