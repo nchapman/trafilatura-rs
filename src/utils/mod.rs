@@ -6,8 +6,6 @@ pub(crate) mod regex_patterns;
 pub(crate) mod text;
 pub(crate) mod url;
 
-use std::path::Path;
-
 use unicode_normalization::UnicodeNormalization;
 
 use crate::dom::{Document, NodeId};
@@ -83,10 +81,13 @@ pub(crate) fn is_image_file(src: &str) -> bool {
     // Extract just the path portion before any query string.
     let path_part = src.split('?').next().unwrap_or(src);
 
-    let ext = Path::new(path_part)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let ext = path_part
+        .split('/')
+        .next_back()
+        .unwrap_or_default()
+        .split('.')
+        .next_back()
+        .unwrap_or_default();
 
     let ext_lower = ext.to_lowercase();
     matches!(
@@ -272,10 +273,12 @@ mod tests {
     #[test]
     fn test_is_image_file() {
         assert!(is_image_file("photo.jpg"));
+        assert!(is_image_file("/photo.jpg"));
         assert!(is_image_file("image.PNG"));
         assert!(is_image_file(
             "https://cdn.example.com/img/photo.webp?size=large"
         ));
+        assert!(is_image_file("//cdn.example.com/img/photo.webp?size=large"));
         assert!(!is_image_file("document.pdf"));
         assert!(!is_image_file("script.js"));
         assert!(!is_image_file(""));
