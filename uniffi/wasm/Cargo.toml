@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 name = "trafilatura_uniffi"
 
 [dependencies]
-uniffi = { version = "0.31", features = ["scaffolding-ffi-buffer-fns", "wasm-unstable-single-threaded"] }
+uniffi = { version = "0.32.2", features = ["scaffolding-ffi-buffer-fns", "wasm-unstable-single-threaded"] }
 thiserror = "2"
 trafilatura = { path = "../.." }
 url = "2"
