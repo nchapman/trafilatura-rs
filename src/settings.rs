@@ -474,3 +474,15 @@ pub(crate) static ALLOWED_ATTRIBUTES: LazyLock<HashSet<&'static str>> = LazyLock
     .into_iter()
     .collect()
 });
+
+// ---------------------------------------------------------------------------
+// Baseline dedupe limits (port of go-trafilatura settings.go v2.2.x)
+// ---------------------------------------------------------------------------
+
+/// Minimum character length for a repeated text block to be dropped as a
+/// duplicate during baseline extraction (Go: `minDuplicateLength`).
+pub(crate) const MIN_DUPLICATE_LENGTH: usize = 50;
+
+/// Cap on accumulated text scanned for substring duplicates in
+/// `build_baseline_body` (Go: `dedupeScanCap`).
+pub(crate) const DEDUPE_SCAN_CAP: usize = 200_000;

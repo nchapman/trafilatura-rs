@@ -192,7 +192,7 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
 
     // Clone the document before destructive cleaning for fallback strategies.
     let doc_backup1 = doc.clone_document();
-    let mut doc_backup2 = doc.clone_document();
+    let doc_backup2 = doc.clone_document();
 
     // Clean and normalise tags on the main work document.
     doc_cleaning(&mut doc, &opts);
@@ -221,7 +221,7 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
     // Rescue with baseline if text is still too short and we are not in precision mode.
     let len_text = tmp_body_text.chars().count();
     if len_text < opts.config.min_extracted_size && opts.focus != ExtractionFocus::FavorPrecision {
-        (content_doc, tmp_body_text) = baseline(&mut doc_backup2);
+        (content_doc, tmp_body_text) = baseline(&doc_backup2);
     }
 
     // Tree size sanity check.

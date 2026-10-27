@@ -13,6 +13,14 @@ the result tree. Rust handlers return `Option<String>` (serialized HTML
 fragments) because ego-tree's `NodeId` is not transferable across different
 `Document` instances.
 
+Because those fragments are re-parsed by `extract_content`/`extract_comments`,
+any **raw text** interpolated into a fragment string (from `text()`, `tail()`,
+`iter_text()`, or `text_content()`) must go through `escape_text` first;
+markup obtained from `inner_html()` is already escaped and must not be
+re-escaped. Without this, decoded entities in text nodes (e.g.
+`Guido &lt;guido at python.org&gt;`) re-enter the tree as real elements on
+re-parse (issue #13).
+
 **Files**: `src/extraction/elements.rs`
 
 ### In-place mutation with text/tail snapshots
@@ -31,6 +39,36 @@ requires explicit handling in a few places where Go's separate text nodes
 behave differently (e.g., leading spaces between elements).
 
 **Files**: `src/dom/tree.rs`
+
+## Baseline Extraction
+
+### Realigned to go-trafilatura v2.2.x / Python trafilatura 2.3.1
+
+`src/extraction/baseline.rs` was originally ported from go-trafilatura as of
+upstream commit `6b0b475` (Oct 2024). Upstream rewrote `baseline.go` in
+September 2026 (commits `2114bfe`/`5ecedf5`) to align with Python trafilatura
+2.3.1, fixing two bugs the original port had inherited verbatim (strategies
+accumulating into one shared `<body>`, and a whole-document text fallback
+that leaked `<head><title>` into results). We ported that rewrite (issue
+#13): fresh body per strategy, `<body>`-only final fallback with no length
+gate, teaser tier, expanded JSON-LD walking, substring dedupe with caps,
+Discourse preload support, and cookie-consent/basic-cleaning updates.
+
+Parts of the same upstream update are **not** ported because nothing else in
+this crate uses them yet:
+
+- `html2txt` (block-aware text dump) — used upstream only by the new core
+  rescue tier below and tests.
+- the core rescue retry that compares extracted length against 20% of
+  `html2txt(doc)` and retries with `recallRetry` (`core.go`). Porting it is a
+  separate quality feature, not part of baseline parity.
+
+Known approximation: `remove_control_characters` keeps whitespace and drops
+`Cc` control characters like upstream, but keeps `Cf` format characters
+(e.g. U+200B zero-width space) that Go's `unicode.IsPrint` filter removes —
+Rust std has no printable/category predicate. Cosmetic only.
+
+**Files**: `src/extraction/baseline.rs`, `src/utils/mod.rs`, `src/settings.rs`
 
 ## Readability Fallback
 

@@ -52,3 +52,28 @@ fn escaped_angle_bracket_text_in_plain_paragraph() {
     assert!(result.content_html.contains("a &lt;b at c&gt; d"));
     assert!(!result.content_html.contains("<b>"));
 }
+
+#[test]
+fn short_page_html_is_not_duplicated_across_strategies() {
+    // Paragraph strategy's <p>tiny</p> must not survive into the default
+    // strategy's result: each strategy builds a fresh body (Python 2.3.1
+    // `_build_body`, go-trafilatura `buildBaselineBody`).
+    let html = "<html><body><p>tiny</p></body></html>";
+    let result = extract(html, &Options::default()).expect("short page extracts");
+
+    assert_eq!(result.content_text, "tiny");
+    assert_eq!(result.content_html, "<p>tiny</p>");
+}
+
+#[test]
+fn empty_body_does_not_return_title() {
+    // The final fallback reads <body> text only; a page whose body is empty
+    // yields no content even when <head><title> carries text (Python: None).
+    let html = "<html><head><title>Empty</title></head><body></body></html>";
+    let result = extract(html, &Options::default());
+
+    assert!(
+        result.is_err(),
+        "empty body must not return the <title> text"
+    );
+}
