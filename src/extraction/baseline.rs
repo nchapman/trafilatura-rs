@@ -27,6 +27,44 @@ use crate::utils::{remove_control_characters, trim, unescape_html};
 /// CSS selector for basic pre-cleaning.
 const BASIC_CLEANING_SELECTOR: &str = "aside, footer, div[id*=\"footer\"], div[class*=\"footer\"], script, style, fencedframe, svg, template";
 
+/// Block-level elements whose boundaries separate text runs in `html2txt`.
+const TEXT_BLOCK_TAGS: &[&str] = &[
+    "address",
+    "article",
+    "aside",
+    "blockquote",
+    "br",
+    "dd",
+    "div",
+    "dl",
+    "dt",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "header",
+    "hr",
+    "li",
+    "main",
+    "nav",
+    "ol",
+    "p",
+    "pre",
+    "section",
+    "summary",
+    "table",
+    "td",
+    "th",
+    "tr",
+    "ul",
+];
+
 /// Cookie-consent markers matched against class and id attributes.
 static RX_COOKIE_CONSENT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -206,7 +244,7 @@ fn collect_json_content(doc: &Document) -> (Vec<String>, Vec<String>) {
     let mut teasers = Vec::new();
 
     let root = doc.root();
-    for script_id in doc.query_selector_all(root, r#"script[type="application/ld+json"]"#) {
+    for script_id in doc.scripts_with_type(&["application/ld+json"]) {
         let text = doc.text_content(script_id);
         if !RX_JSON_CONTENT_HOOK.is_match(&text) {
             continue;
@@ -401,6 +439,94 @@ pub(crate) fn baseline(doc: &Document) -> (Document, String) {
         return (teaser_body, teaser_text);
     }
     (body, text)
+}
+
+/// Basic block-aware text dump of an HTML document.
+///
+/// Port of Go's `html2txt` and Python's public `trafilatura.html2txt`: used by
+/// the recall-escalation tier to measure how much of the page the main
+/// extraction recovered. Non-HTML input (e.g. feeds, whose first tag is not
+/// `html`/`head`/`body`) yields an empty string, mirroring Go's tokenizer
+/// pre-check without paying for a parse.
+pub fn html2txt(html: &str) -> String {
+    // Cheap HTML-vs-feed discriminator: Go tokenizes and inspects the first
+    // start tag. Skip doctypes/comments/PIs (`<!`, `<?`) and closing tags,
+    // then require the first opening tag to be html/head/body.
+    let bytes = html.as_bytes();
+    let mut i = 0;
+    loop {
+        let Some(lt) = html[i..].find('<') else {
+            return String::new();
+        };
+        i += lt;
+        match bytes.get(i + 1) {
+            Some(b'!') | Some(b'?') => {
+                let Some(gt) = html[i..].find('>') else {
+                    return String::new();
+                };
+                i += gt + 1;
+            }
+            Some(b'/') => {
+                let Some(gt) = html[i..].find('>') else {
+                    return String::new();
+                };
+                i += gt + 1;
+            }
+            Some(c) if c.is_ascii_alphabetic() => {
+                let start = i + 1;
+                let mut end = start;
+                while end < bytes.len() && bytes[end].is_ascii_alphanumeric() {
+                    end += 1;
+                }
+                let tag = html[start..end].to_ascii_lowercase();
+                if tag != "html" && tag != "head" && tag != "body" {
+                    return String::new();
+                }
+                break;
+            }
+            // `<` followed by anything else is not a tag start; keep scanning.
+            _ => i += 1,
+        }
+    }
+
+    let doc = Document::parse(html);
+    html2txt_doc(&doc)
+}
+
+/// Document-input variant of [`html2txt`] (Go accepts `*html.Node` too).
+/// Clones before cleaning so the caller's tree is untouched.
+pub(crate) fn html2txt_doc(doc: &Document) -> String {
+    let mut cleaned = doc.clone_document();
+    let root = cleaned.body().unwrap_or_else(|| cleaned.root());
+    basic_cleaning(&mut cleaned);
+
+    let mut out = String::new();
+    spaced_text(&cleaned, root, 0, &mut out);
+    trim(&out)
+}
+
+/// Appends text content with spaces at block-element boundaries so adjacent
+/// runs from minified markup do not stick together.
+///
+/// Port of the `visit` closure in Go's `html2txt`.
+fn spaced_text(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
+    if depth >= MAX_TREE_DEPTH {
+        return;
+    }
+    let block = TEXT_BLOCK_TAGS.contains(&doc.tag_name(id));
+    if block {
+        out.push(' ');
+    }
+    if doc.is_text(id) {
+        let text = doc.text_content(id);
+        out.push_str(&remove_control_characters(&text));
+    }
+    for child in doc.child_nodes(id) {
+        spaced_text(doc, child, depth + 1, out);
+    }
+    if block {
+        out.push(' ');
+    }
 }
 
 /// Collects trimmed per-text-node content under a subtree in document order.
@@ -1147,5 +1273,62 @@ mod tests {
         // Must complete without stack overflow; deep content is truncated.
         let (_, text) = baseline(&doc(&pathological));
         assert!(!text.contains("unreachable text"));
+    }
+
+    // -----------------------------------------------------------------
+    // html2txt (ported from go-trafilatura Test_HTML2Text_Upstream22 / Test_Python220)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn test_html2txt() {
+        for (input, expected) in [
+            ("<html><body>Here is the body text</body></html>", "Here is the body text"),
+            ("", ""),
+            ("123", ""),
+            ("<html></html>", ""),
+            ("<html><body/></html>", ""),
+            (
+                "<html><body><style>font-size: 8pt</style><p>ABC</p></body></html>",
+                "ABC",
+            ),
+            (
+                "<html><body><p>First block.</p><p>Second block.</p><h2>Heading</h2>line<br>break</body></html>",
+                "First block. Second block. Heading line break",
+            ),
+            ("<html><body><div>a<p>b</p></div></body></html>", "a b"),
+            ("<html><body><p>Hyper<b>link</b></p></body></html>", "Hyperlink"),
+            // feed: first tag is not html/head/body
+            (
+                r#"<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Feed title</title></feed>"#,
+                "",
+            ),
+            (
+                "<html><body><svg><title>Icon name</title></svg><template><p>markup</p></template><p>visible</p></body></html>",
+                "visible",
+            ),
+        ] {
+            assert_eq!(html2txt(input), expected, "input: {input}");
+        }
+    }
+
+    #[test]
+    fn test_html2txt_control_chars() {
+        assert_eq!(
+            html2txt("<html><body><p>before\u{01}after visible text</p></body></html>"),
+            "beforeafter visible text"
+        );
+    }
+
+    #[test]
+    fn test_html2txt_input_not_mutated() {
+        let html = r#"<html><body class="cookies-not-set"><div>A<b>B</b>C</div><p>Second<br>line</p><div class="CookieConsentBanner">Discard consent text</div></body></html>"#;
+        let d = doc(html);
+        let snapshot = d.inner_html(d.body().unwrap());
+        assert_eq!(html2txt_doc(&d), "ABC Second line");
+        assert_eq!(
+            d.inner_html(d.body().unwrap()),
+            snapshot,
+            "input must not be mutated"
+        );
     }
 }

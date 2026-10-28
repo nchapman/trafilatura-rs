@@ -211,10 +211,10 @@ fn print_performance(p: &Performance) {
 /// Full comparison across all extraction modes.
 ///
 /// Actual measured scores on 960 entries:
-///   Balanced (no fallback): precision=0.911  recall=0.895  accuracy=0.904  f-score=0.903
-///   Balanced + Fallback:    precision=0.908  recall=0.920  accuracy=0.914  f-score=0.914
-///   FavorPrecision:         precision=0.920  recall=0.901  accuracy=0.912  f-score=0.911
-///   FavorRecall:            precision=0.901  recall=0.922  accuracy=0.911  f-score=0.911
+///   Balanced (no fallback): precision=0.912  recall=0.903  accuracy=0.908  f-score=0.907
+///   Balanced + Fallback:    precision=0.907  recall=0.918  accuracy=0.912  f-score=0.913
+///   FavorPrecision:         precision=0.921  recall=0.900  accuracy=0.912  f-score=0.910
+///   FavorRecall:            precision=0.903  recall=0.920  accuracy=0.911  f-score=0.911
 ///
 /// (Recall rose ~2.4pp across fallback modes with the v2.2.x baseline port,
 /// issue #13; precision held within 0.3pp.)

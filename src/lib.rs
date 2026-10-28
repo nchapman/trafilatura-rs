@@ -85,6 +85,7 @@ pub mod utils;
 
 // Convenience re-exports for library users and the CLI binary.
 pub use error::TrafilaturaError;
+pub use extraction::baseline::html2txt;
 pub use options::{Config, ExtractionFocus, FallbackCandidates, HtmlDateMode, Options};
 pub use result::{ExtractResult, Metadata};
 
@@ -93,8 +94,8 @@ pub use html2markdown::Options as MarkdownOptions;
 
 use crate::dom::Document;
 use crate::extraction::{
-    baseline::baseline,
-    external::compare_external_extraction,
+    baseline::{baseline, html2txt_doc},
+    external::{compare_external_extraction, justext_rescue},
     html_processing::{convert_tags, doc_cleaning, post_cleaning, prune_unwanted_nodes},
     {extract_comments, extract_content},
 };
@@ -103,6 +104,7 @@ use crate::utils::{
     language::{check_html_language, language_classifier},
     lru::LruCache,
     text::duplicate_test,
+    trim,
 };
 
 /// Parse an HTML string and extract its main readable content.
@@ -190,6 +192,16 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
         }
     }
 
+    // Port of go-trafilatura v2.2.x `extractionSequence` entry: on a thread-forum
+    // (schema.org DiscussionForumPosting) the comment containers hold the actual
+    // posts, so they are never pruned there; with comments excluded they are
+    // pruned from the raw tree up front so every stage (main, external, retry)
+    // inherits it.
+    let is_forum = forum_thread_page(&doc);
+    if opts.exclude_comments && (opts.focus == ExtractionFocus::FavorPrecision || !is_forum) {
+        doc = prune_unwanted_nodes(&doc, selector::discard::REMOVED_COMMENTS, false);
+    }
+
     // Clone the document before destructive cleaning for fallback strategies.
     let doc_backup1 = doc.clone_document();
     let doc_backup2 = doc.clone_document();
@@ -199,20 +211,36 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
     convert_tags(&mut doc, &opts);
 
     // Extract comments first (comments sections are removed from `doc` as a side-effect).
+    // On a thread-forum the captured "comments" are the posts: route them into the
+    // body instead and re-prepare the work tree (the comment containers were consumed).
+    let mut forum_posts: Option<Document> = None;
     let (comments_doc, tmp_comments) = if !opts.exclude_comments {
-        extract_comments(&mut doc, &mut cache, &opts)
-    } else {
-        if opts.focus == ExtractionFocus::FavorPrecision {
-            doc = prune_unwanted_nodes(&doc, selector::discard::REMOVED_COMMENTS, false);
+        let (comments_doc, tmp_comments) = extract_comments(&mut doc, &mut cache, &opts);
+        if !tmp_comments.is_empty() && is_forum {
+            forum_posts = comments_doc;
+            let mut fresh = doc_backup2.clone_document();
+            doc_cleaning(&mut fresh, &opts);
+            convert_tags(&mut fresh, &opts);
+            doc = fresh;
+            (None, String::new())
+        } else {
+            (comments_doc, tmp_comments)
         }
+    } else {
         (None, String::new())
     };
     let len_comments = tmp_comments.chars().count();
 
+    // Precision mode prunes comment containers post-conversion as well (lists are
+    // converted elements here and match additional rules) — except on forums.
+    if opts.focus == ExtractionFocus::FavorPrecision && !is_forum {
+        doc = prune_unwanted_nodes(&doc, selector::discard::REMOVED_COMMENTS, false);
+    }
+
     // Main content extraction.
     let (mut content_doc, mut tmp_body_text) = extract_content(&doc, &mut cache, &opts);
 
-    // External fallback comparison (readability / domdistiller).
+    // External fallback comparison (readability / justext).
     if opts.enable_fallback {
         (content_doc, tmp_body_text) =
             compare_external_extraction(&doc_backup1, content_doc, &opts);
@@ -222,6 +250,71 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
     let len_text = tmp_body_text.chars().count();
     if len_text < opts.config.min_extracted_size && opts.focus != ExtractionFocus::FavorPrecision {
         (content_doc, tmp_body_text) = baseline(&doc_backup2);
+        // The dump saw the whole page: missing posts are boilerplate, not lost.
+        forum_posts = None;
+    }
+
+    // Recall escalation (port of go-trafilatura v2.2.x / Python 2.3.1): a short
+    // extraction covering little of the page suggests under-extraction
+    // (non-article layout) — retry in recall mode, keep if clearly bigger.
+    let len_text = tmp_body_text.chars().count();
+    if opts.focus == ExtractionFocus::Balanced && len_text > 0 && len_text < 3000 {
+        let page_len = html2txt_doc(&doc_backup2).chars().count();
+        if (len_text as f64) < 0.2 * page_len as f64 {
+            // Retry on a comment-pruned copy so captured reader comments cannot
+            // double into the retry output — except on a thread-forum, where the
+            // retry rescues the posts.
+            // The pruned variant needs an owned binding; on a forum the raw
+            // backup is used as-is (recall_retry clones internally).
+            let pruned_retry;
+            let retry_doc: &Document = if is_forum {
+                &doc_backup2
+            } else {
+                pruned_retry =
+                    prune_unwanted_nodes(&doc_backup2, selector::discard::REMOVED_COMMENTS, false);
+                &pruned_retry
+            };
+            let (retry_body, retry_text) = recall_retry(retry_doc, &opts);
+            let retry_len = retry_text.chars().count();
+
+            // A justext candidate runs alongside the rule-based retry (Python
+            // parity): a different algorithm reaches div-buried content the
+            // rules cannot. justext tends to over-include rather than stop at
+            // page boundaries, so it needs a stricter bar than the retry's 1.5x
+            // and must also beat the retry's length. Skipped in fast mode.
+            let justext = if opts.enable_fallback {
+                justext_rescue(retry_doc, &opts)
+            } else {
+                None
+            };
+            let justext_len = justext
+                .as_ref()
+                .map(|(_, text)| text.chars().count())
+                .unwrap_or(0);
+
+            if justext_len > retry_len
+                && (justext_len as f64) > ESCALATION_JUSTEXT_RATIO * len_text as f64
+            {
+                let (j_body, j_text) = justext.expect("length checked above");
+                // An accepted candidate saw the full page: its exclusions are deliberate.
+                content_doc = j_body;
+                tmp_body_text = j_text;
+                forum_posts = None;
+            } else if retry_len >= opts.config.min_extracted_size
+                && (retry_len as f64) > 1.5 * len_text as f64
+            {
+                // An accepted candidate saw the full page: its exclusions are deliberate.
+                content_doc = retry_body;
+                tmp_body_text = retry_text;
+                forum_posts = None;
+            }
+        }
+    }
+
+    // Thread-forum salvage: a gate (escalation length, precision) may have blocked
+    // the cascade from restoring the posts — append the ones missing from the body.
+    if let Some(posts_doc) = forum_posts {
+        salvage_forum_posts(&mut content_doc, &mut tmp_body_text, &posts_doc);
     }
 
     // Tree size sanity check.
@@ -304,8 +397,103 @@ pub fn extract_document(doc: Document, opts: &Options) -> Result<ExtractResult, 
 }
 
 // ---------------------------------------------------------------------------
-// Readable document builder
+// Recall escalation & thread-forum handling (port of go-trafilatura v2.2.x
+// core.go `extractionSequence` additions, aligned with Python 2.3.1)
 // ---------------------------------------------------------------------------
+
+/// Thread-forum marker: a schema.org `DiscussionForumPosting` type in JSON-LD.
+/// Matched on raw script text (not JSON-parsed) — real-world payloads can be
+/// invalid JSON yet still carry the marker.
+/// justext escalation candidate: justext over-includes (whole pricing tables,
+/// unrelated sections) rather than stopping at page boundaries the way the
+/// rule-based retry does, so it needs a stricter bar than the retry's 1.5x.
+/// Calibrated against Python's benchmark suite — don't tune in isolation.
+const ESCALATION_JUSTEXT_RATIO: f64 = 2.0;
+
+static DISCUSSION_FORUM_POSTING: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(
+    || {
+        regex::Regex::new(
+            r#""@type"[\s\v\x{1c}-\x{1f}\x{85}\p{Z}]*:[\s\v\x{1c}-\x{1f}\x{85}\p{Z}]*(?:"DiscussionForumPosting"|\[[^\]]*"DiscussionForumPosting")"#,
+        )
+        .expect("valid DiscussionForumPosting regex")
+    },
+);
+
+/// Detects a thread-forum page where posts live in the same containers that
+/// comment pruning would remove — comments are content here, unlike on a blog.
+///
+/// Port of Go's `forumThreadPage` / Python's `_forum_thread_page`. Q&A forums
+/// (QAPage) are deliberately not matched; forums without the marker are an
+/// accepted miss.
+fn forum_thread_page(doc: &Document) -> bool {
+    doc.scripts_with_type(&["application/ld+json"])
+        .iter()
+        .any(|&script_id| DISCUSSION_FORUM_POSTING.is_match(&doc.text_content(script_id)))
+}
+
+/// Appends captured forum posts that the main cascade did not already recover
+/// into the body, then recomputes the body text.
+///
+/// Port of the forum-salvage block in Go's `extractionSequence`. Post elements
+/// move between documents via serialize/re-parse (NodeIds do not transfer
+/// across `Document` instances; see DEVIATIONS.md) — a lossless round-trip.
+fn salvage_forum_posts(
+    content_doc: &mut Document,
+    tmp_body_text: &mut String,
+    posts_doc: &Document,
+) {
+    let body = content_doc.body().unwrap_or_else(|| content_doc.root());
+    let existing: Vec<String> = content_doc
+        .children(body)
+        .iter()
+        .map(|&child| trim(&content_doc.text_content(child)))
+        .collect();
+    let body_text = existing.join("\n");
+
+    let mut salvaged_html = Vec::new();
+    if let Some(posts_body) = posts_doc.body() {
+        for &post_id in &posts_doc.children(posts_body) {
+            let post_text = trim(&posts_doc.text_content(post_id));
+            if !post_text.is_empty() && !body_text.contains(&post_text) {
+                salvaged_html.push(posts_doc.outer_html(post_id));
+            }
+        }
+    }
+    if salvaged_html.is_empty() {
+        return;
+    }
+
+    // Rebuild via inner_html: unlike children()+outer_html, it keeps bare text
+    // children and tails (e.g. promoted by the final div strip in extract_content).
+    let existing_html = content_doc.inner_html(body);
+    let full_html = format!(
+        "<html><body>{existing_html}{}</body></html>",
+        salvaged_html.concat()
+    );
+    *content_doc = Document::parse(&full_html);
+    let new_body = content_doc.body().unwrap_or_else(|| content_doc.root());
+    *tmp_body_text = trim(&content_doc.iter_text(new_body, " "));
+}
+
+/// Re-runs content extraction in FavorRecall mode on a prepared copy of the
+/// original document, for the recall-escalation tier.
+///
+/// Port of Go's `recallRetry`: fresh cache, recall focus, optional external
+/// fallback comparison on the original tree.
+fn recall_retry(doc: &Document, opts: &Options) -> (Document, String) {
+    let mut retry_opts = opts.clone();
+    retry_opts.focus = ExtractionFocus::FavorRecall;
+    let mut cache = LruCache::new(retry_opts.config.cache_size);
+
+    let mut work = doc.clone_document();
+    doc_cleaning(&mut work, &retry_opts);
+    convert_tags(&mut work, &retry_opts);
+    let (mut body, mut text) = extract_content(&work, &mut cache, &retry_opts);
+    if retry_opts.enable_fallback {
+        (body, text) = compare_external_extraction(doc, body, &retry_opts);
+    }
+    (body, text)
+}
 
 /// Creates a complete, self-contained HTML document from an [`ExtractResult`].
 ///
@@ -518,6 +706,166 @@ fn write_front_matter(out: &mut String, m: &Metadata) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---------------------------------------------------------------------------
+    // Forum detection (python-2.2.0-reference.json `forums` samples)
+    // ---------------------------------------------------------------------------
+
+    // The detection regex deliberately matches raw script text rather than parsed
+    // JSON: real-world payloads can be invalid JSON yet still carry the marker,
+    // and conversely a padded or URL-prefixed type must not match.
+    const FORUM_SAMPLES: &[(&str, bool)] = &[
+    // (html, is_forum)
+    (r#"<script type="application/ld+json">null</script>"#, false),
+    (r#"<script type="application/json">null</script>"#, false),
+    (r#"<script type="APPLICATION/LD+JSON">null</script>"#, false),
+    (
+        r#"<script type="application/ld+json">{"@type":"DiscussionForumPosting"}</script>"#,
+        true,
+    ),
+    (
+        r#"<script type="application/json">{"@type":"DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"@type":"DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    // padded type inside array: not the exact quoted string
+    (
+        r#"<script type="application/ld+json">{"@type":["Article"," DiscussionForumPosting "]}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="application/json">{"@type":["Article"," DiscussionForumPosting "]}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"@type":["Article"," DiscussionForumPosting "]}</script>"#,
+        false,
+    ),
+    // case-sensitive type name
+    (
+        r#"<script type="application/ld+json">{"@graph":{"mainEntity":[{"child":{"@type":"DISCUSSIONFORUMPOSTING"}}]}}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="application/json">{"@graph":{"mainEntity":[{"child":{"@type":"DISCUSSIONFORUMPOSTING"}}]}}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"@graph":{"mainEntity":[{"child":{"@type":"DISCUSSIONFORUMPOSTING"}}]}}</script>"#,
+        false,
+    ),
+    // nested arrays
+    (
+        r#"<script type="application/ld+json">[{"@type":"Article"},[{"@type":"DiscussionForumPosting"}]]</script>"#,
+        true,
+    ),
+    (
+        r#"<script type="application/json">[{"@type":"Article"},[{"@type":"DiscussionForumPosting"}]]</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">[{"@type":"Article"},[{"@type":"DiscussionForumPosting"}]]</script>"#,
+        false,
+    ),
+    // URL-prefixed type: not an exact match
+    (
+        r#"<script type="application/ld+json">{"@type":"https://schema.org/DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="application/json">{"@type":"https://schema.org/DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"@type":"https://schema.org/DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    // marker on an unrelated key
+    (
+        r#"<script type="application/ld+json">{"unrelated":"DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="application/json">{"unrelated":"DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"unrelated":"DiscussionForumPosting"}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="application/ld+json">{"@type":5}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="application/json">{"@type":5}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"@type":5}</script>"#,
+        false,
+    ),
+    // invalid JSON (trailing comma) still carries the marker
+    (
+        r#"<script type="application/ld+json">{"@type":"DiscussionForumPosting",}</script>"#,
+        true,
+    ),
+    (
+        r#"<script type="application/json">{"@type":"DiscussionForumPosting",}</script>"#,
+        false,
+    ),
+    (
+        r#"<script type="APPLICATION/LD+JSON">{"@type":"DiscussionForumPosting",}</script>"#,
+        false,
+    ),
+    // raw newline inside the JSON string
+    (
+        "<script type=\"application/ld+json\">{\"@type\":\"DiscussionForumPosting\",\"text\":\"raw\nnewline\"}</script>",
+        true,
+    ),
+    (
+        "<script type=\"application/json\">{\"@type\":\"DiscussionForumPosting\",\"text\":\"raw\nnewline\"}</script>",
+        false,
+    ),
+    (
+        "<script type=\"APPLICATION/LD+JSON\">{\"@type\":\"DiscussionForumPosting\",\"text\":\"raw\nnewline\"}</script>",
+        false,
+    ),
+];
+
+    #[test]
+    fn test_salvage_forum_posts_keeps_bare_text_body() {
+        // A wild-text body can hold bare text children (promoted when the final
+        // div strip removes their wrappers). Salvage appends captured posts via
+        // serialize/re-parse; the rebuild must keep those text nodes.
+        let mut content_doc = Document::parse(
+            "<html><body>Opening post text<div><p>kept paragraph</p></div></body></html>",
+        );
+        let mut body_text = content_doc
+            .iter_text(content_doc.body().unwrap(), " ")
+            .trim()
+            .to_string();
+        let posts_doc = Document::parse(
+            "<html><body><p>Reply number 0 genuine post</p><p>Reply number 1 genuine post</p></body></html>",
+        );
+
+        salvage_forum_posts(&mut content_doc, &mut body_text, &posts_doc);
+
+        assert!(body_text.contains("Opening post text"), "lost: {body_text}");
+        assert!(body_text.contains("kept paragraph"), "lost: {body_text}");
+        assert_eq!(body_text.matches("Reply number").count(), 2);
+    }
+
+    #[test]
+    fn test_forum_thread_page_reference_samples() {
+        for (html, expected) in FORUM_SAMPLES {
+            let doc = Document::parse(html);
+            assert_eq!(forum_thread_page(&doc), *expected, "input: {html}");
+        }
+    }
 
     fn simple_article(body: &str) -> String {
         format!("<html><head><title>Test</title></head><body>{body}</body></html>")

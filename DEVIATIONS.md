@@ -57,11 +57,14 @@ Discourse preload support, and cookie-consent/basic-cleaning updates.
 Parts of the same upstream update are **not** ported because nothing else in
 this crate uses them yet:
 
-- `html2txt` (block-aware text dump) — used upstream only by the new core
-  rescue tier below and tests.
-- the core rescue retry that compares extracted length against 20% of
-  `html2txt(doc)` and retries with `recallRetry` (`core.go`). Porting it is a
-  separate quality feature, not part of baseline parity.
+- Go's `test-files/python-2.2.0-reference.json` regression harness (11k
+  samples plus the 30 forum-detection ones). The 30 forum samples are
+  inlined as unit tests instead (`FORUM_SAMPLES` in `src/lib.rs`); the full
+  harness remains optional future parity work.
+
+The update's September 2026 core rewrite — recall escalation, thread-forum
+handling, and comment-exclusion pruning — **is** ported; see "Recall
+Escalation and Thread-Forums" below.
 
 Known approximation: `remove_control_characters` keeps whitespace and drops
 `Cc` control characters like upstream, but keeps `Cf` format characters
@@ -100,6 +103,17 @@ integration tests:
 - `test_extract_love_hina`: readability-rs includes comment sections
 - `test_extract_rnz_witzel`: readability-rs extracts nav instead of article
 
+To keep fallback candidates aligned with upstream where it matters most,
+the readability input is pre-pruned with the unlikely-candidates rule
+(`UNLIKELY_CANDIDATES` in `src/selector/discard.rs`, ported from the
+preprocessing inside go-trafilatura's readability-lxml engine / Python's
+readability-lxml): comment-, sidebar-, and promo-marked containers are
+removed unless they also match a possible-content token (`and|article|body|
+column|main|shadow`). Upstream applies this rule inside its readability
+engine; we apply it to the input of the `readability` crate because we keep
+that engine. Residual differences remain wherever the two engines' scoring
+disagrees after pruning.
+
 ### No dom-distiller fallback
 
 Go's fallback pipeline includes dom-distiller as a third option. Rust omits
@@ -107,6 +121,46 @@ it — no suitable Rust equivalent is available. Fallback uses user-provided
 candidates and readability only.
 
 **Files**: `src/extraction/external.rs`
+
+## Recall Escalation and Thread-Forums
+
+Ported from go-trafilatura v2.2.x / Python trafilatura 2.3.1 (September
+2026 update): `forum_thread_page` (DiscussionForumPosting marker in raw
+JSON-LD script text), the comment-exclusion entry prune
+(`exclude_comments && (Precision || !forum)`), the forum re-route (captured
+posts set aside, tree re-prepared, salvage appends missing posts), and the
+Balanced recall escalation (retry when the result is < 3000 chars and covers
+< 20% of `html2txt`, accepted at ≥ `min_extracted_size` and > 1.5×).
+
+Deviations within this area:
+
+- **justext escalation candidate (Python parity, Go divergence).** Python
+  runs a `justext_rescue` candidate alongside the rule-based retry and
+  prefers it when it beats both the retry's length and 2× the current
+  result (`ESCALATION_JUSTEXT_RATIO`). Go ported only the rule-based retry,
+  and three of Go's own new tests fail on its HEAD as a result
+  (`forum_keeps_posts`, `no_comment_doubling/div`, the `details` faq case —
+  verified at `b471c0d`). We port the justext candidate, so all of our
+  ported escalation tests pass. Measured cost on our 960-document
+  comparison corpus: −0.1pp f-score in the fallback mode it affects (the
+  rule-based tier alone is +0.4pp f-score no-fallback, +0.8pp recall).
+- **JSON-LD scripts matched case-sensitively.** Our CSS engine follows the
+  HTML spec's case-insensitive attribute-value list (`type` is in it), so a
+  selector like `script[type="application/ld+json"]` also matches
+  `APPLICATION/LD+JSON`; upstream stacks (cascadia/lxml) compare exactly, and
+  the upstream reference corpus pins the case-sensitive behavior.
+  `Document::scripts_with_type` queries broadly and post-filters on the
+  exact attribute value to match upstream.
+- **Forum post salvage round-trips through serialization.** Go splices
+  captured post nodes into the body tree; NodeIds do not transfer across
+  our `Document` instances, so posts move via serialize/re-parse (lossless).
+- Not ported: Python's `RAW_TREE_PRUNE_XPATH` (pre-prune feeding the external
+  extractors) and the conditional baseline accept from Python #896 (baseline
+  taken only when it adds text); our baseline tier keeps Go's shape.
+
+**Files**: `src/lib.rs`, `src/extraction/baseline.rs` (`html2txt`),
+`src/extraction/external.rs`, `src/selector/discard.rs`,
+`src/dom/query.rs`
 
 ## Language Detection
 
