@@ -15,10 +15,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
-	trafilatura "github.com/markusmobius/go-trafilatura"
+	trafilatura "github.com/markusmobius/go-trafilatura/v2"
 )
 
 type ComparisonEntry struct {
@@ -46,8 +47,9 @@ func main() {
 	noFallback := flag.Bool("no-fallback", false, "Disable fallback for single-file mode")
 	flag.Parse()
 
-	if *corpusPath == "" || *testFilesDir == "" {
-		fmt.Fprintln(os.Stderr, "Usage: go run bench_go.go -corpus <entries.json> -testfiles <test-files-dir>")
+	if *testFilesDir == "" {
+		fmt.Fprintln(os.Stderr, "Usage: go run bench_go.go -testfiles <test-files-dir> [-corpus <entries.json>]")
+		fmt.Fprintln(os.Stderr, "Without -corpus only the single-document speed benchmarks run.")
 		os.Exit(1)
 	}
 
@@ -62,10 +64,10 @@ func main() {
 		fmt.Printf("Running %d iterations...\n", *singleN)
 
 		opts := trafilatura.Options{
-			EnableFallback: !*noFallback,
-			Focus:          trafilatura.Balanced,
+			EnableFallback:  !*noFallback,
+			Focus:           trafilatura.Balanced,
 			ExcludeComments: true,
-			ExcludeTables:  false,
+			ExcludeTables:   false,
 		}
 
 		// Warmup
@@ -84,72 +86,77 @@ func main() {
 		return
 	}
 
-	// Load corpus
-	data, err := os.ReadFile(*corpusPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to read %s: %v\n", *corpusPath, err)
-		os.Exit(1)
-	}
-
-	var entries []ComparisonEntry
-	if err := json.Unmarshal(data, &entries); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to parse entries: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Load all HTML files
-	var corpus []string
-	var totalBytes int64
-	for _, e := range entries {
-		if html, ok := loadHTML(e.File, *testFilesDir); ok {
-			corpus = append(corpus, html)
-			totalBytes += int64(len(html))
-		}
-	}
-	fmt.Printf("Loaded %d documents (%d bytes total)\n", len(corpus), totalBytes)
-
+	// Shared options for the corpus and single-document benchmarks,
+	// matching benches/extraction.rs and scripts/bench_speed.py.
 	opts := trafilatura.Options{
-		EnableFallback: true,
-		Focus:          trafilatura.Balanced,
+		EnableFallback:  true,
+		Focus:           trafilatura.Balanced,
 		ExcludeComments: true,
-		ExcludeTables:  false,
+		ExcludeTables:   false,
 	}
 
-	// Warmup
-	fmt.Println("Warming up...")
-	for _, html := range corpus[:min(10, len(corpus))] {
-		trafilatura.Extract(strings.NewReader(html), opts)
-	}
+	// Corpus benchmark (optional: with -corpus)
+	if *corpusPath != "" {
+		data, err := os.ReadFile(*corpusPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read %s: %v\n", *corpusPath, err)
+			os.Exit(1)
+		}
 
-	// Corpus benchmark
-	fmt.Printf("Running %d iterations over %d documents...\n", *iterations, len(corpus))
-	var times []time.Duration
-	for iter := 0; iter < *iterations; iter++ {
-		start := time.Now()
-		for _, html := range corpus {
+		var entries []ComparisonEntry
+		if err := json.Unmarshal(data, &entries); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to parse entries: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Load all HTML files
+		var corpus []string
+		var totalBytes int64
+		for _, e := range entries {
+			if html, ok := loadHTML(e.File, *testFilesDir); ok {
+				corpus = append(corpus, html)
+				totalBytes += int64(len(html))
+			}
+		}
+		fmt.Printf("Loaded %d documents (%d bytes total)\n", len(corpus), totalBytes)
+
+		// Warmup
+		fmt.Println("Warming up...")
+		for _, html := range corpus[:min(10, len(corpus))] {
 			trafilatura.Extract(strings.NewReader(html), opts)
 		}
-		elapsed := time.Since(start)
-		times = append(times, elapsed)
-		throughput := float64(totalBytes) / elapsed.Seconds() / 1024 / 1024
-		fmt.Printf("  Iteration %d: %v (%.1f MiB/s)\n", iter+1, elapsed, throughput)
-	}
 
-	// Summary
-	var total time.Duration
-	best := times[0]
-	for _, t := range times {
-		total += t
-		if t < best {
-			best = t
+		// Corpus benchmark
+		fmt.Printf("Running %d iterations over %d documents...\n", *iterations, len(corpus))
+		var times []time.Duration
+		for iter := 0; iter < *iterations; iter++ {
+			start := time.Now()
+			for _, html := range corpus {
+				trafilatura.Extract(strings.NewReader(html), opts)
+			}
+			elapsed := time.Since(start)
+			times = append(times, elapsed)
+			throughput := float64(totalBytes) / elapsed.Seconds() / 1024 / 1024
+			fmt.Printf("  Iteration %d: %v (%.1f MiB/s)\n", iter+1, elapsed, throughput)
 		}
+
+		// Summary
+		var total time.Duration
+		best := times[0]
+		for _, t := range times {
+			total += t
+			if t < best {
+				best = t
+			}
+		}
+		avg := total / time.Duration(len(times))
+		avgThroughput := float64(totalBytes) / avg.Seconds() / 1024 / 1024
+		bestThroughput := float64(totalBytes) / best.Seconds() / 1024 / 1024
+		fmt.Printf("\nCorpus: %d docs, %d bytes\n", len(corpus), totalBytes)
+		fmt.Printf("Average: %v (%.1f MiB/s)\n", avg, avgThroughput)
+		fmt.Printf("Best:    %v (%.1f MiB/s)\n", best, bestThroughput)
+
 	}
-	avg := total / time.Duration(len(times))
-	avgThroughput := float64(totalBytes) / avg.Seconds() / 1024 / 1024
-	bestThroughput := float64(totalBytes) / best.Seconds() / 1024 / 1024
-	fmt.Printf("\nCorpus: %d docs, %d bytes\n", len(corpus), totalBytes)
-	fmt.Printf("Average: %v (%.1f MiB/s)\n", avg, avgThroughput)
-	fmt.Printf("Best:    %v (%.1f MiB/s)\n", best, bestThroughput)
 
 	// Single-document benchmarks for the same files as Rust
 	singlePages := []struct {
@@ -162,7 +169,7 @@ func main() {
 		{"xlarge (906KB)", "pcgamer.com.skyrim.html"},
 	}
 
-	fmt.Println("\n--- Single document benchmarks ---")
+	fmt.Println("\n--- Single document benchmarks (median) ---")
 	for _, p := range singlePages {
 		html, ok := loadHTML(p.file, *testFilesDir)
 		if !ok {
@@ -176,13 +183,14 @@ func main() {
 			trafilatura.Extract(strings.NewReader(html), opts)
 		}
 
-		start := time.Now()
+		durations := make([]time.Duration, 0, n)
 		for i := 0; i < n; i++ {
+			start := time.Now()
 			trafilatura.Extract(strings.NewReader(html), opts)
+			durations = append(durations, time.Since(start))
 		}
-		elapsed := time.Since(start)
-		perIter := elapsed / time.Duration(n)
-		throughput := float64(len(html)) * float64(n) / elapsed.Seconds() / 1024 / 1024
-		fmt.Printf("  %-20s %6d bytes  %10v/iter  %.1f MiB/s\n", p.label, len(html), perIter, throughput)
+		sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+		median := durations[len(durations)/2]
+		fmt.Printf("  %-20s %6d bytes  %10v median\n", p.label, len(html), median)
 	}
 }

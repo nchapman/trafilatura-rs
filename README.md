@@ -197,10 +197,10 @@ Extraction time per document, Rust vs Go ([go-trafilatura](https://github.com/ma
 
 | Document | Rust | Go | Python |
 |----------|-----:|---:|-------:|
-| small (6 KB) | 606 µs | 1.19 ms | 1.1 ms |
-| medium (85 KB) | 3.84 ms | 5.6 ms | 6.2 ms |
-| large (382 KB) | 2.90 ms | 4.9 ms | 4.7 ms |
-| xlarge (906 KB) | 8.81 ms | 13.9 ms | 13.9 ms |
+| small (6 KB) | 606 µs | 885 µs | 1.12 ms |
+| medium (85 KB) | 3.84 ms | 4.43 ms | 4.54 ms |
+| large (382 KB) | 2.90 ms | 4.47 ms | 3.81 ms |
+| xlarge (906 KB) | 8.81 ms | 12.0 ms | 11.5 ms |
 
 ### Extraction quality
 
@@ -208,20 +208,28 @@ Evaluated on a 960-entry dataset (strings expected to be present/absent in extra
 
 | Implementation | Precision | Recall | Accuracy | F-score |
 |----------------|----------:|-------:|---------:|--------:|
-| **Rust** (balanced + fallback) | 0.908 | 0.919 | 0.913 | 0.913 |
-| Python trafilatura | 0.920 | 0.909 | 0.915 | 0.914 |
-| Go go-trafilatura | 0.909 | 0.921 | 0.914 | 0.915 |
+| **Rust** (balanced + fallback) | 0.907 | 0.919 | 0.912 | 0.913 |
+| Python trafilatura 2.3.1 | 0.920 | 0.920 | 0.920 | 0.920 |
+| Go go-trafilatura v2.2.6 | 0.916 | 0.917 | 0.916 | 0.916 |
 
 All three implementations produce near-identical quality scores. Minor differences stem from HTML parser handling and Unicode normalization.
 
-Measured on Apple M4 Max, Rust 1.99, macOS 15.7.
+Measured on Apple M4 Max, Rust 1.99, go-trafilatura v2.2.6, Python trafilatura 2.3.1, macOS 15.7.
 
 Reproduce:
 
 ```sh
-cargo bench                                            # speed benchmarks
-cargo test --test comparison_test -- --nocapture       # Rust quality scores
-python3 scripts/compare_python.py > /dev/null          # Python quality (stderr)
+cargo bench --bench extraction -- single_document    # Rust speed (criterion medians)
+cargo test --test comparison_test -- --nocapture     # Rust quality
+cd /path/to/go-trafilatura && \
+  go run /path/to/trafilatura-rs/scripts/bench_go.go \
+    -testfiles /path/to/trafilatura-rs/test-files     # Go speed (single-doc medians)
+cd /path/to/go-trafilatura && \
+  go run /path/to/trafilatura-rs/scripts/compare_go.go \
+    -corpus /path/to/trafilatura-rs/comparison-data/entries.json \
+    -testfiles /path/to/trafilatura-rs/test-files     # Go quality
+python3 scripts/bench_speed.py                        # Python speed (median)
+python3 scripts/compare_python.py > /dev/null         # Python quality (stderr)
 ```
 
 ## Acknowledgements
