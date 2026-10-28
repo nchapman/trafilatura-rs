@@ -119,28 +119,16 @@ pub(crate) fn prune_unwanted_nodes(doc: &Document, rules: &[Rule], with_backup: 
 
     let mut work = doc.clone_document();
 
-    // Collect all matches upfront, then remove in reverse order.
+    // Collect all matches upfront, then remove in reverse order. Tail text
+    // nodes stay in place (`keep_tail = true`): current Go prunes with
+    // `etree.Remove(node, true)`. The older Go tail-juggling (SetTail on the
+    // previous sibling or the parent) moved a first child's tail outside its
+    // parent — e.g. body text after a pruned comment container — and upstream
+    // replaced it with keep-tail removal.
     let root = work.root();
     let matches = query_all(&work, root, rules);
     for &id in matches.iter().rev() {
-        // Preserve tail text before removing.
-        // Go always uses SetTail on the previous sibling (if any) or on the parent:
-        //   previous = subElement.PrevSibling or subElement.Parent
-        //   etree.SetTail(previous, previousTail + " " + tail)
-        let tail = work.tail(id);
-        if !tail.is_empty() {
-            let target = work.prev_element_sibling(id).or_else(|| work.parent(id));
-            if let Some(target_id) = target {
-                let prev_tail = work.tail(target_id);
-                let new_tail = if prev_tail.is_empty() {
-                    tail
-                } else {
-                    format!("{prev_tail} {tail}")
-                };
-                work.set_tail(target_id, &new_tail);
-            }
-        }
-        work.remove(id, false);
+        work.remove(id, true);
     }
 
     if with_backup {

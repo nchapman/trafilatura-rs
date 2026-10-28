@@ -293,4 +293,45 @@ fn test_html2txt_public() {
         "First block. Second block."
     );
     assert_eq!(html2txt("123"), "");
+    // A full comment before <html> must be skipped whole: a `>` inside it is
+    // not the comment terminator (Go's tokenizer skips entire comments).
+    assert_eq!(
+        html2txt("<!-- <span> <div>ignored</div> --><html><body>Visible</body></html>"),
+        "Visible"
+    );
+    // Doctypes and processing instructions still end at their first `>`.
+    assert_eq!(
+        html2txt("<!DOCTYPE html><html><body>Doc page</body></html>"),
+        "Doc page"
+    );
+}
+
+#[test]
+fn test_pruned_comment_container_keeps_following_text() {
+    // Text following a comment container stays in the body when the container
+    // is pruned (keep-tail removal): the body-only baseline must still see it.
+    let html = "<html><body><div id=\"comments\">ignored</div>real article text that should survive and is long enough to matter for the baseline floor.</body></html>";
+    let mut opts = Options::default();
+    opts.exclude_comments = true;
+    let text = text_of(html, opts);
+    assert!(text.contains("real article text"), "got: {text}");
+}
+
+#[test]
+fn test_forum_salvage_dedupes_nested_formatting_fragments() {
+    // The comments pass can capture a reply <p> and its nested <b> as separate
+    // fragments; salvage must not append both and double the inline text.
+    let opening = "<p>Opening post paragraph that runs well past the escalation gate so no rescue pass interferes with the salvage path under review.</p>".repeat(14);
+    let mut posts = String::new();
+    for i in 0..2 {
+        posts.push_str(&format!(
+            "<p class='comment-body'>Reply {i} <b>important words</b> continues with enough text to be captured as a comment today.</p>"
+        ));
+    }
+    let html = format!(
+        "<html><head>{FORUM_JSONLD}</head><body><article>{opening}</article><div id='comments' class='comments-area'>{posts}</div></body></html>"
+    );
+    let text = text_of(&html, Options::default());
+    assert_eq!(text.matches("important words").count(), 2, "got: {text}");
+    assert_eq!(text.matches("Reply").count(), 2, "got: {text}");
 }

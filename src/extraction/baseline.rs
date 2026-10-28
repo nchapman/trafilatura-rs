@@ -297,11 +297,12 @@ fn collect_json_content(doc: &Document) -> (Vec<String>, Vec<String>) {
 fn render_baseline_text(raw: &str) -> String {
     let raw = remove_control_characters(&unescape_html(raw));
     if RX_EMBEDDED_HTML.is_match(&raw) {
+        // Wrap, then read the whole body: markup that closes the wrapper div
+        // early (e.g. a leading `</div>`) pushes content out of that first
+        // child, and Go's SetInnerHTML keeps it as container content.
         let tmp = Document::parse(&format!("<html><body><div>{raw}</div></body></html>"));
         if let Some(body) = tmp.body() {
-            if let Some(&div_id) = tmp.children(body).first() {
-                return trim(&tmp.text_content(div_id));
-            }
+            return trim(&tmp.text_content(body));
         }
     }
     trim(&raw)
@@ -460,6 +461,14 @@ pub fn html2txt(html: &str) -> String {
         };
         i += lt;
         match bytes.get(i + 1) {
+            Some(b'!') if html[i..].starts_with("<!--") => {
+                // Comment: skip the complete terminator — a `>` inside the
+                // comment is not the end (Go's tokenizer skips whole comments).
+                let Some(end) = html[i + 4..].find("-->") else {
+                    return String::new();
+                };
+                i += 4 + end + 3;
+            }
             Some(b'!') | Some(b'?') => {
                 let Some(gt) = html[i..].find('>') else {
                     return String::new();
@@ -854,6 +863,12 @@ mod tests {
         // p<q and i<b and c>d prose must stay intact.
         let prose = "If p<q then u<s or i<b and c>d holds, with extra padding to comfortably exceed the one hundred character gate.";
         assert_eq!(render_baseline_text(prose), prose);
+        // Markup that closes the wrapper div early must not lose the content
+        // after it: Go's SetInnerHTML keeps such content in the container.
+        assert_eq!(
+            render_baseline_text("</div><section>content after the wrapper close.</section>"),
+            "content after the wrapper close."
+        );
     }
 
     #[test]

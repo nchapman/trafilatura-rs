@@ -448,14 +448,18 @@ fn salvage_forum_posts(
         .iter()
         .map(|&child| trim(&content_doc.text_content(child)))
         .collect();
-    let body_text = existing.join("\n");
+    let mut body_text = existing.join("\n");
 
     let mut salvaged_html = Vec::new();
     if let Some(posts_body) = posts_doc.body() {
         for &post_id in &posts_doc.children(posts_body) {
             let post_text = trim(&posts_doc.text_content(post_id));
+            // Track accepted posts in the dedupe text: a captured parent post
+            // and a nested inline fragment of it (e.g. a <b> captured
+            // separately by the comments pass) must not both be appended.
             if !post_text.is_empty() && !body_text.contains(&post_text) {
                 salvaged_html.push(posts_doc.outer_html(post_id));
+                body_text.push_str(&post_text);
             }
         }
     }
