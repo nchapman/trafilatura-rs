@@ -19,7 +19,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::dom::{Document, NodeId};
+use crate::dom::{Document, NodeId, MAX_TREE_DEPTH};
 use crate::metadata::json_ld::get_schema_types;
 use crate::settings::{DEDUPE_SCAN_CAP, MIN_DUPLICATE_LENGTH};
 use crate::utils::{remove_control_characters, trim, unescape_html};
@@ -391,7 +391,7 @@ pub(crate) fn baseline(doc: &Document) -> (Document, String) {
     // -----------------------------------------------------------------
     let mut parts: Vec<String> = Vec::new();
     if let Some(body_id) = doc.body() {
-        collect_text_parts(&doc, body_id, &mut parts);
+        collect_text_parts(&doc, body_id, 0, &mut parts);
     }
     let (body, text) = build_baseline_body(&[parts.join("\n")], false);
 
@@ -405,8 +405,14 @@ pub(crate) fn baseline(doc: &Document) -> (Document, String) {
 
 /// Collects trimmed per-text-node content under a subtree in document order.
 ///
-/// Port of the `collectText` closure in Go's `baseline`.
-fn collect_text_parts(doc: &Document, id: NodeId, parts: &mut Vec<String>) {
+/// Port of the `collectText` closure in Go's `baseline`. Depth-capped like
+/// every other recursive walk in this crate (Go grows goroutine stacks
+/// dynamically; Rust thread stacks are fixed, so unbounded recursion on
+/// pathologically nested markup would overflow).
+fn collect_text_parts(doc: &Document, id: NodeId, depth: usize, parts: &mut Vec<String>) {
+    if depth >= MAX_TREE_DEPTH {
+        return;
+    }
     for child in doc.child_nodes(id) {
         if doc.is_text(child) {
             let text = trim(&doc.text_content(child));
@@ -414,7 +420,7 @@ fn collect_text_parts(doc: &Document, id: NodeId, parts: &mut Vec<String>) {
                 parts.push(text);
             }
         } else if doc.is_element(child) {
-            collect_text_parts(doc, child, parts);
+            collect_text_parts(doc, child, depth + 1, parts);
         }
     }
 }
@@ -605,6 +611,23 @@ mod tests {
         basic_cleaning(&mut d);
         let body_html = d.inner_html(d.body().unwrap());
         assert_eq!(body_html.trim(), "<p>visible</p>");
+    }
+
+    #[test]
+    fn test_basic_cleaning_keeps_tail_text_of_removed_elements() {
+        // Go's etree.Remove(el, true) keeps tail text of removed elements
+        // (x/net/html tails are separate sibling nodes that survive removal);
+        // the default strategy's body dump then still sees that text.
+        let html = r#"<html><body><aside>discard me</aside> tail text survives <p>after</p></body></html>"#;
+        let mut d = Document::parse(html);
+        basic_cleaning(&mut d);
+        let body = d.body().unwrap();
+        let body_html = d.inner_html(body);
+        assert!(
+            body_html.contains("tail text survives"),
+            "tail must survive removal; got: {body_html}"
+        );
+        assert!(!body_html.contains("discard me"));
     }
 
     #[test]
@@ -1101,5 +1124,28 @@ mod tests {
             "<html><head><title>Empty</title></head><body></body></html>",
         ));
         assert!(text.is_empty(), "title must not leak; got: {text}");
+    }
+    #[test]
+    fn test_baseline_deeply_nested_markup_no_stack_overflow() {
+        // html5ever does not cap nesting; the default-strategy walk must be
+        // depth-capped like every other traversal or pathological markup
+        // overflows the stack (Go grows goroutine stacks instead).
+        //
+        // Reachable text (within MAX_TREE_DEPTH) is still collected; content
+        // nested deeper is truncated, consistent with text_content/iter_text.
+        let shallow = format!(
+            "<html><body>{}<p>deep text</p></body></html>",
+            "<div>".repeat(400)
+        );
+        let (_, text) = baseline(&doc(&shallow));
+        assert!(text.contains("deep text"), "got: {text}");
+
+        let pathological = format!(
+            "<html><body>{}<p>unreachable text</p></body></html>",
+            "<div>".repeat(5_000)
+        );
+        // Must complete without stack overflow; deep content is truncated.
+        let (_, text) = baseline(&doc(&pathological));
+        assert!(!text.contains("unreachable text"));
     }
 }

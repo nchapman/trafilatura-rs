@@ -68,6 +68,19 @@ Known approximation: `remove_control_characters` keeps whitespace and drops
 (e.g. U+200B zero-width space) that Go's `unicode.IsPrint` filter removes —
 Rust std has no printable/category predicate. Cosmetic only.
 
+Also matching upstream deliberately: JSON-LD script text is decoded **raw**
+(no script-level `unescape_html`) — upstream dropped the old script-level
+unescape in the same rewrite; entity decoding happens per value in
+`render_baseline_text`. Consequence: a script whose JSON is fully
+HTML-escaped (`&quot;…&quot;`) is skipped by both Python 2.3.1 and Go v2.2.x
+too. The metadata JSON-LD path still unescapes, because upstream's
+metadata extractor does.
+
+The default strategy's text-node walk is depth-capped (`MAX_TREE_DEPTH`)
+like every other traversal in this crate; Go relies on growable goroutine
+stacks where Rust would overflow, so content nested deeper than the cap is
+truncated (other baseline walks were already capped via `text_content`).
+
 **Files**: `src/extraction/baseline.rs`, `src/utils/mod.rs`, `src/settings.rs`
 
 ## Readability Fallback
