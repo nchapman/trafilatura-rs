@@ -35,6 +35,42 @@ pub(crate) const DISCARDED_COMMENTS: &[super::Rule] = &[
 /// Port of `RemovedComments`.
 pub(crate) const REMOVED_COMMENTS: &[super::Rule] = &[removed_comments_rule1];
 
+/// Containers that readability-style extractors treat as unlikely content
+/// candidates: comments, sidebars, headers, footers, promos, and similar
+/// boilerplate.
+///
+/// Port of the unlikely-candidates preprocessing in go-trafilatura's
+/// readability-lxml engine (`readabilityLxmlRemoveUnlikely`), itself the
+/// classic arc90 readability heuristic: an element whose combined
+/// `class`/`id` matches an unlikely token — unless it also matches a
+/// "possible content" token such as `main` or `article` — is unlikely to be
+/// main content. Exposed as a regular rule so it composes with
+/// [`prune_unwanted_nodes`](crate::extraction::prune_unwanted_nodes) like any
+/// other discard set.
+pub(crate) const UNLIKELY_CANDIDATES: &[super::Rule] = &[unlikely_candidates_rule1];
+
+static UNLIKELY_TOKENS: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"(?i)combx|comment|community|disqus|extra|foot|header|menu|remark|rss|shoutbox|sidebar|sponsor|ad-break|agegate|pagination|pager|popup|tweet|twitter").unwrap()
+});
+
+static POSSIBLE_CONTENT_TOKENS: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"(?i)and|article|body|column|main|shadow").unwrap()
+    });
+
+/// Matches boilerplate-marked containers whose `class`/`id` contains an
+/// unlikely token but no possible-content token.
+///
+/// Port of `readabilityLxmlRemoveUnlikely`. `<html>` and `<body>` are exempt.
+fn unlikely_candidates_rule1(doc: &Document, id: NodeId) -> bool {
+    let tag = doc.tag_name(id);
+    if tag == "html" || tag == "body" {
+        return false;
+    }
+    let attributes = format!("{} {}", doc.class_name(id), doc.id_attr(id));
+    UNLIKELY_TOKENS.is_match(&attributes) && !POSSIBLE_CONTENT_TOKENS.is_match(&attributes)
+}
+
 /// Rules that discard image caption containers.
 ///
 /// Port of `DiscardedImage`.
@@ -268,15 +304,17 @@ fn discarded_comments_rule3(doc: &Document, id: NodeId) -> bool {
 fn removed_comments_rule1(doc: &Document, id: NodeId) -> bool {
     let tag = doc.tag_name(id);
     match tag {
-        "div" | "ol" | "ul" | "dl" | "section" => {}
+        "div" | "ol" | "ul" | "dl" | "section" | "details" => {}
         _ => return false,
     }
 
     let class = doc.class_name(id);
     let elem_id = doc.id_attr(id);
 
-    starts_with(&lower(&elem_id), "comment")
-        || starts_with(&lower(&class), "comment")
+    starts_with(&elem_id, "comment")
+        || starts_with(&elem_id, "Comment")
+        || starts_with(&class, "comment")
+        || starts_with(&class, "Comment")
         || contains(&class, "article-comments")
         || contains(&class, "post-comments")
         || starts_with(&elem_id, "comol")
@@ -395,6 +433,35 @@ mod tests {
         let doc = parse(r#"<html><body><div id="respond">form</div></body></html>"#);
         let body = doc.body().unwrap();
         assert!(query(&doc, body, DISCARDED_COMMENTS).is_some());
+    }
+
+    #[test]
+    fn test_unlikely_candidates_rule() {
+        let matches = |html: &str| {
+            let doc = parse(html);
+            let body = doc.body().unwrap();
+            query(&doc, body, UNLIKELY_CANDIDATES).is_some()
+        };
+        // Boilerplate-marked containers match …
+        assert!(matches(
+            r#"<html><body><div id="comments" class="comments-area">x</div></body></html>"#
+        ));
+        assert!(matches(
+            r#"<html><body><aside class="sidebar">x</aside></body></html>"#
+        ));
+        assert!(matches(
+            r#"<html><body><div class="promo sponsor-box">x</div></body></html>"#
+        ));
+        // … unless a possible-content token appears (and|article|body|column|main|shadow).
+        assert!(!matches(
+            r#"<html><body><div class="comment-body">x</div></body></html>"#
+        ));
+        assert!(!matches(
+            r#"<html><body><div class="comments main-area">x</div></body></html>"#
+        ));
+        assert!(!matches(
+            r#"<html><body><article class="">article body</article></body></html>"#
+        ));
     }
 
     #[test]

@@ -31,6 +31,32 @@ impl Document {
         self.query_selector_all_compiled(root, &sel)
     }
 
+    /// Returns `<script>` elements whose `type` attribute exactly equals one
+    /// of `types`.
+    ///
+    /// The CSS engine matches `type` values case-insensitively (it is in the
+    /// HTML spec's case-insensitive attribute list), but upstream matches
+    /// exactly: Go's cascadia and Python's lxml both compare attribute values
+    /// case-sensitively, and the upstream reference corpus pins
+    /// `APPLICATION/LD+JSON` as *not* a JSON-LD script. This helper reproduces
+    /// upstream semantics with an exact-value post-filter.
+    pub fn scripts_with_type(&self, types: &[&str]) -> Vec<NodeId> {
+        let selector = types
+            .iter()
+            .map(|t| format!(r#"script[type="{t}"]"#))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.query_selector_all(self.root(), &selector)
+            .into_iter()
+            .filter(|&id| {
+                matches!(
+                    self.get_attribute(id, "type").as_deref(),
+                    Some(t) if types.contains(&t)
+                )
+            })
+            .collect()
+    }
+
     /// Find the first element matching a pre-compiled selector (early termination).
     pub(crate) fn query_first_compiled(&self, root: NodeId, sel: &Selector) -> Option<NodeId> {
         self.find_first_matching(root, sel, 0)

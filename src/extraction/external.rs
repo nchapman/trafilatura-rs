@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 
 use crate::dom::Document;
 use crate::options::{ExtractionFocus, Options};
-use crate::selector::discard::OVERALL_DISCARDED_CONTENT;
+use crate::selector::discard::{OVERALL_DISCARDED_CONTENT, UNLIKELY_CANDIDATES};
 use crate::settings::VALID_TAG_CATALOG;
 use crate::utils::trim;
 
@@ -60,6 +60,12 @@ pub(crate) fn compare_external_extraction(
     } else {
         original_doc.clone_document()
     };
+
+    // Readability-lxml strips unlikely containers itself before scoring; our
+    // libreadability engine relies on its own, different heuristics. Apply the
+    // unlikely-candidates rule to the readability input so fallback candidates
+    // stay aligned with upstream (documented in DEVIATIONS.md).
+    let cleaned_doc = prune_unwanted_nodes(&cleaned_doc, UNLIKELY_CANDIDATES, false);
 
     // Serialize to HTML for readability input. Readability needs a clean parse
     // (html5ever normalization) to produce correct results.
@@ -344,7 +350,10 @@ fn try_justext(html: &str, stoplist: &HashSet<String>) -> Document {
 /// runs justext, and returns the result if non-empty.
 ///
 /// Port of Python's `justext_rescue`.
-fn justext_rescue(original_doc: &Document, opts: &Options) -> Option<(Document, String)> {
+pub(crate) fn justext_rescue(
+    original_doc: &Document,
+    opts: &Options,
+) -> Option<(Document, String)> {
     let mut cleaned = original_doc.clone_document();
     basic_cleaning(&mut cleaned);
 

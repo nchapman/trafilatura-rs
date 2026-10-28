@@ -4,7 +4,9 @@ mod query;
 mod tree;
 
 pub use ego_tree::NodeId;
+
 use scraper::Node;
+pub(crate) use tree::MAX_TREE_DEPTH;
 
 /// A parsed HTML document backed by an ego-tree.
 ///

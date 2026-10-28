@@ -9,8 +9,10 @@ use tendril::StrTendril;
 use super::Document;
 
 /// Maximum recursion depth for DOM tree traversals.
-/// html5ever caps nesting at ~256 during parsing, so this is generous headroom.
-const MAX_TREE_DEPTH: usize = 500;
+/// html5ever does not cap nesting during parsing (100k-deep trees parse
+/// successfully), so every recursive walk must guard against stack overflow
+/// with this cap.
+pub(crate) const MAX_TREE_DEPTH: usize = 500;
 
 /// HTML void elements — those that cannot have children.
 const VOID_ELEMENTS: &[&str] = &[

@@ -1090,10 +1090,8 @@ pub(super) fn examine_meta_date(doc: &Document, extensive: bool) -> Option<chron
 /// `dateModified` first, then `datePublished`; the first script in
 /// document order with a parseable plausible date wins.
 pub(super) fn json_search_date(doc: &Document) -> Option<chrono::NaiveDate> {
-    let sel = r#"script[type="application/ld+json"], script[type="application/settings+json"]"#;
-
     let mut scripts: Vec<String> = Vec::new();
-    for node_id in doc.query_selector_all(doc.root(), sel) {
+    for node_id in doc.scripts_with_type(&["application/ld+json", "application/settings+json"]) {
         let text = trim(&doc.text_content(node_id));
         if !text.is_empty() {
             scripts.push(text);
@@ -1315,6 +1313,28 @@ mod tests {
 
     fn parse(html: &str) -> Document {
         Document::parse(html)
+    }
+
+    #[test]
+    fn test_json_search_date_type_matching_is_case_sensitive() {
+        // Same case-sensitivity rule as the author/title JSON-LD path:
+        // APPLICATION/LD+JSON must not contribute a date.
+        let doc = parse(
+            r#"<html><head><script type="APPLICATION/LD+JSON">
+            {"@type":"Article","datePublished":"2024-01-02"}
+            </script></head><body></body></html>"#,
+        );
+        assert_eq!(json_search_date(&doc), None);
+
+        let doc = parse(
+            r#"<html><head><script type="application/ld+json">
+            {"@type":"Article","datePublished":"2024-01-02"}
+            </script></head><body></body></html>"#,
+        );
+        assert_eq!(
+            json_search_date(&doc).map(|d| d.to_string()),
+            Some("2024-01-02".to_string())
+        );
     }
 
     // ---------------------------------------------------------------------------

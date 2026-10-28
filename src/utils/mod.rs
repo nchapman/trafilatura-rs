@@ -125,6 +125,19 @@ pub(crate) fn uniquify_lists(inputs: &[&str]) -> Vec<String> {
     result
 }
 
+/// Removes characters that are neither printable nor whitespace.
+///
+/// Port of Go's `removeControlCharacters` (keeps `unicode.IsPrint || IsSpace`).
+/// Rust has no `is_printable`; this approximation keeps all whitespace
+/// (matching Go's `IsSpace`) and drops control characters (`Cc`). Format
+/// characters (`Cf`, e.g. zero-width space) are kept where Go removes them —
+/// a cosmetic divergence noted in DEVIATIONS.md.
+pub(crate) fn remove_control_characters(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_whitespace() || !c.is_control())
+        .collect()
+}
+
 /// Decodes common HTML entities in a string.
 ///
 /// Handles named entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&nbsp;`, etc.)

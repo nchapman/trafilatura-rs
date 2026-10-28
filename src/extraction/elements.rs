@@ -29,6 +29,27 @@ fn escape_attr(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
+/// Escapes text for interpolation into an HTML fragment string.
+///
+/// Handlers return serialized fragments that are re-parsed by `extract_content`
+/// (see DEVIATIONS.md); raw text must therefore be escaped so the parse is
+/// lossless and decoded entities (`a &lt;b at c&gt; d`) cannot re-enter the
+/// tree as real elements. Matches html5ever's text-node serialization set
+/// (`&`, nbsp, `<`, `>`) so output is byte-identical to a serialize/parse cycle.
+fn escape_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '\u{00A0}' => out.push_str("&nbsp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 // ---------------------------------------------------------------------------
 // Titles
 // ---------------------------------------------------------------------------
@@ -162,7 +183,7 @@ fn process_nested_element(
     opts: &Options,
     depth: usize,
 ) -> String {
-    let mut inner = doc.text(child_id);
+    let mut inner = escape_text(&doc.text(child_id));
 
     let sub_elements = doc.get_elements_by_tag_name(child_id, "*");
     for &sub_id in &sub_elements {
@@ -195,11 +216,14 @@ fn process_nested_element(
                                 .map(|val| format!(" {}=\"{}\"", name, escape_attr(&val)))
                         })
                         .collect();
-                    inner.push_str(&format!("<{stag}{attrs_html}>{sub_text}</{stag}>"));
+                    inner.push_str(&format!(
+                        "<{stag}{attrs_html}>{}</{stag}>",
+                        escape_text(&sub_text)
+                    ));
                 }
                 if !tail.is_empty() {
                     inner.push(' ');
-                    inner.push_str(&tail);
+                    inner.push_str(&escape_text(&tail));
                 }
             }
         }
@@ -211,7 +235,7 @@ fn process_nested_element(
     let item_tail = trim(&doc.tail(child_id));
     if !item_tail.is_empty() {
         inner.push(' ');
-        inner.push_str(&item_tail);
+        inner.push_str(&escape_text(&item_tail));
     }
 
     inner
@@ -243,7 +267,7 @@ fn handle_lists_inner(
     // If the element has direct text (before any children), add it as <li>.
     let direct_text = trim(&doc.text(id));
     if !direct_text.is_empty() {
-        items.push(format!("<li>{direct_text}</li>"));
+        items.push(format!("<li>{}</li>", escape_text(&direct_text)));
     }
 
     // Iterate all descendants looking for list item tags (li, dt, dd).
@@ -264,9 +288,9 @@ fn handle_lists_inner(
             let text = trim(&doc.text(desc_id));
             let tail = trim(&doc.tail(desc_id));
             let content = match (!text.is_empty(), !tail.is_empty()) {
-                (true, true) => format!("{text} {tail}"),
-                (true, false) => text,
-                (false, true) => tail,
+                (true, true) => format!("{} {}", escape_text(&text), escape_text(&tail)),
+                (true, false) => escape_text(&text),
+                (false, true) => escape_text(&tail),
                 (false, false) => {
                     doc.set_tag_name(desc_id, "done");
                     continue;
@@ -546,7 +570,10 @@ pub(crate) fn handle_other_elements(
             if text_chars_test(&text) {
                 doc.clear_attributes(id);
                 let result_tag = if tag == "div" { "p" } else { tag.as_str() };
-                return Some(format!("<{result_tag}>{text}</{result_tag}>"));
+                return Some(format!(
+                    "<{result_tag}>{}</{result_tag}>",
+                    escape_text(&text)
+                ));
             }
         }
     }
@@ -583,11 +610,11 @@ pub(crate) fn handle_paragraphs(
         // include element's tail so sibling text (e.g. after a nested <p>) is preserved.
         let tail = trim(&doc.tail(id));
         let tail_part = if !tail.is_empty() {
-            format!(" {tail}")
+            format!(" {}", escape_text(&tail))
         } else {
             String::new()
         };
-        return Some(format!("<p>{text}</p>{tail_part}"));
+        return Some(format!("<p>{}</p>{tail_part}", escape_text(&text)));
     }
 
     // Complex case: paragraph has child elements.
@@ -706,7 +733,7 @@ pub(crate) fn handle_paragraphs(
         // (e.g. ", CCC." after a nested <p> in malformed HTML) are not lost.
         let tail = trim(&doc.tail(id));
         let tail_part = if !tail.is_empty() {
-            format!(" {tail}")
+            format!(" {}", escape_text(&tail))
         } else {
             String::new()
         };
@@ -798,11 +825,11 @@ fn build_cell_content(
         let text = trim(&doc.text(cell_id));
         let tail = trim(&doc.tail(cell_id));
         let content = if !text.is_empty() && !tail.is_empty() {
-            format!("{text} {tail}")
+            format!("{} {}", escape_text(&text), escape_text(&tail))
         } else if !text.is_empty() {
-            text
+            escape_text(&text)
         } else {
-            tail
+            escape_text(&tail)
         };
         return if content.is_empty() {
             None
@@ -812,7 +839,7 @@ fn build_cell_content(
     }
 
     // Cell has children: iterate and build content.
-    let mut cell_inner = doc.text(cell_id);
+    let mut cell_inner = escape_text(&doc.text(cell_id));
     // Mark cell as done to prevent double-processing of cell element itself.
     doc.set_tag_name(cell_id, "done");
 
@@ -833,12 +860,12 @@ fn build_cell_content(
                 let t = &child_tag;
                 if !text.is_empty() {
                     Some(if !tail.is_empty() {
-                        format!("<{t}>{text}</{t}> {tail}")
+                        format!("<{t}>{}</{t}> {}", escape_text(&text), escape_text(&tail))
                     } else {
-                        format!("<{t}>{text}</{t}>")
+                        format!("<{t}>{}</{t}>", escape_text(&text))
                     })
                 } else if !tail.is_empty() {
-                    Some(tail)
+                    Some(escape_text(&tail))
                 } else {
                     None
                 }
@@ -896,7 +923,7 @@ pub(crate) fn handle_text_elem(
         if text_chars_test(&tail) && process_node(doc, id, cache, opts).is_some() {
             let tail_text = trim(&doc.tail(id));
             if !tail_text.is_empty() {
-                return Some(format!("<p>{tail_text}</p>"));
+                return Some(format!("<p>{}</p>", escape_text(&tail_text)));
             }
         }
         None

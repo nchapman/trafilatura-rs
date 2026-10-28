@@ -173,11 +173,9 @@ fn decode_json_ld(
     let mut organizations: Vec<SchemaData> = Vec::new();
     let mut articles: Vec<SchemaData> = Vec::new();
 
-    // Find all script nodes with JSON+LD schema.
-    let mut script_ids =
-        doc.query_selector_all(doc.root(), r#"script[type="application/ld+json"]"#);
-    script_ids
-        .extend(doc.query_selector_all(doc.root(), r#"script[type="application/settings+json"]"#));
+    // Find all script nodes with JSON+LD schema (exact `type` values —
+    // see `Document::scripts_with_type`).
+    let script_ids = doc.scripts_with_type(&["application/ld+json", "application/settings+json"]);
 
     for script_id in script_ids {
         let json_text = doc.text_content(script_id);
@@ -583,6 +581,34 @@ mod tests {
         let result = extract_json_ld(&Options::default(), &doc, Metadata::default());
         assert_eq!(result.author, "Jane Writer");
         assert_eq!(result.title, "Test Article");
+    }
+
+    #[test]
+    fn test_extract_json_ld_type_matching_is_case_sensitive() {
+        // Upstream (cascadia/lxml) compares `type` exactly; the CSS engine
+        // would match case-insensitively. APPLICATION/LD+JSON is not JSON-LD.
+        let html = r#"<html><head>
+            <script type="APPLICATION/LD+JSON">
+            {"@type":"Article","name":"Uppercase","author":{"@type":"Person","name":"Wrong"}}
+            </script>
+        </head><body></body></html>"#;
+        let doc = Document::parse(html);
+        let result = extract_json_ld(&Options::default(), &doc, Metadata::default());
+        assert_eq!(result.author, "");
+        assert_eq!(result.title, "");
+    }
+
+    #[test]
+    fn test_extract_json_ld_settings_json_still_read() {
+        let html = r#"<html><head>
+            <script type="application/settings+json">
+            {"@type":"Article","name":"From Settings","author":{"@type":"Person","name":"Settings Author"}}
+            </script>
+        </head><body></body></html>"#;
+        let doc = Document::parse(html);
+        let result = extract_json_ld(&Options::default(), &doc, Metadata::default());
+        assert_eq!(result.author, "Settings Author");
+        assert_eq!(result.title, "From Settings");
     }
 
     #[test]

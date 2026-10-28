@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	trafilatura "github.com/markusmobius/go-trafilatura"
+	trafilatura "github.com/markusmobius/go-trafilatura/v2"
 )
 
 type ComparisonEntry struct {
