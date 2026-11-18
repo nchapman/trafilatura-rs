@@ -50,6 +50,40 @@ fn test_table_simple() {
     );
 }
 
+#[test]
+fn test_table_cell_preserves_code_annotations_and_inline_breaks() {
+    let html = in_article(
+        "<table><tr><td><code>k1</code><br>\n<code>k2</code> (not supported in QPR1)<br><code>k3</code></td>\
+         <td><code>k4</code>, see &lt;notes&gt; &amp; errata<br></td></tr></table>",
+    );
+    let result = extract(&html, &zero_opts()).unwrap();
+    assert!(
+        result.content_html.contains(
+            "<td><code>k1</code><br><code>k2</code> (not supported in QPR1)<br><code>k3</code></td>\
+             <td><code>k4</code>, see &lt;notes&gt; &amp; errata</td>"
+        ),
+        "{}",
+        result.content_html
+    );
+    assert!(result.content_text.contains("(not supported in QPR1)"));
+    assert!(result.content_text.contains("see <notes> & errata"));
+}
+
+#[test]
+fn test_table_cell_break_before_formatting_vs_text() {
+    let html = in_article(
+        "<table><tr><td><code>k<b>1</b></code><br><b>stable</b><br>older releases<code>k2</code></td></tr></table>",
+    );
+    let result = extract(&html, &zero_opts()).unwrap();
+    assert!(
+        result.content_html.contains(
+            "<td><code>k<b>1</b></code><br><b>stable</b><p>older releases</p><code>k2</code></td>"
+        ),
+        "{}",
+        result.content_html
+    );
+}
+
 /// Table cell with `<p>` children: paragraph structure should be preserved.
 ///
 /// Port of "If a cell contains 'exotic' tags…" in Test_TableProcessing.

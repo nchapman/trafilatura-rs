@@ -809,6 +809,17 @@ pub(crate) fn handle_table(
     Some(format!("<table>{}</table>", rows.join("")))
 }
 
+/// Python's `_fill_cell` keeps an otherwise empty line break before inline content.
+fn separates_cell_inline(doc: &Document, id: NodeId) -> bool {
+    doc.next_element_sibling(id).is_some_and(|next| {
+        let tag = doc.tag_name(next);
+        tag == "code"
+            || XML_HI_TAGS.contains(tag)
+            || XML_REF_TAGS.contains(tag)
+            || XML_GRAPHIC_TAGS.contains(tag)
+    }) && !text_chars_test(&doc.tail(id))
+}
+
 /// Builds content string for a single table cell (td/th).
 fn build_cell_content(
     doc: &mut Document,
@@ -850,7 +861,14 @@ fn build_cell_content(
         }
         let child_tag = doc.tag_name(child_id).to_string();
 
-        let sub_html = if XML_CELL_TAGS.contains(child_tag.as_str())
+        let sub_html = if child_tag == "code" {
+            // The code handler serializes the subtree, but its tail belongs to the cell.
+            let mut html = handle_code_blocks(doc, child_id).unwrap_or_default();
+            html.push_str(&escape_text(&doc.tail(child_id)));
+            Some(html)
+        } else if XML_LB_TAGS.contains(child_tag.as_str()) && separates_cell_inline(doc, child_id) {
+            Some("<br>".to_owned())
+        } else if XML_CELL_TAGS.contains(child_tag.as_str())
             || XML_HI_TAGS.contains(child_tag.as_str())
         {
             let processed = handle_text_node(doc, child_id, cache, true, false, opts);
