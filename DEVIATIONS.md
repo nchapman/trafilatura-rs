@@ -40,6 +40,14 @@ behave differently (e.g., leading spaces between elements).
 
 **Files**: `src/dom/tree.rs`
 
+## Table cells
+
+For issue #15, table cells follow [Python's `_fill_cell`](https://github.com/adbar/trafilatura/blob/v2.3.1/trafilatura/main_extractor.py#L363-L408):
+keep the text following `<code>` and retain a line break with an empty or
+whitespace-only tail before inline content such as another `<code>`.
+Go v2.2.6 keeps the code tail but drops the separator. Rust continues to emit
+`<code>` in HTML rather than Python's HTML serializer's `<pre>`.
+
 ## Baseline Extraction
 
 ### Realigned to go-trafilatura v2.2.x / Python trafilatura 2.3.1
