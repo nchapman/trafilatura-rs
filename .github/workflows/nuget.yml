@@ -2,6 +2,11 @@ name: NuGet
 
 on:
   workflow_dispatch:
+    inputs:
+      retry_tag:
+        description: 'Publish the existing NuGet artifact for a release tag (run from main). Leave blank for a normal build.'
+        type: string
+        required: false
   push:
     tags: ['v*']
 
@@ -11,6 +16,7 @@ env:
 jobs:
   build-native:
     name: Build ${{ matrix.rid }}
+    if: ${{ !inputs.retry_tag }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -66,7 +72,7 @@ jobs:
           path: uniffi/target/${{ matrix.target }}/release/${{ matrix.lib }}
 
   pack:
-    name: Pack & Publish
+    name: Pack
     needs: build-native
     runs-on: ubuntu-latest
     steps:
@@ -137,13 +143,56 @@ jobs:
           else
             VERSION="0.0.0-dev"
           fi
-          dotnet pack nuget/Trafilatura.csproj -c Release -o nuget/out -p:Version=$VERSION
+          dotnet pack nuget/Trafilatura.csproj -c Release -o nuget/out -p:Version="$VERSION"
 
       - uses: actions/upload-artifact@v7
         with:
           name: nuget-package
           path: nuget/out/*.nupkg
 
-      - name: Publish to NuGet
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: dotnet nuget push nuget/out/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+  publish:
+    name: Publish to NuGet
+    needs: pack
+    if: >-
+      !cancelled() &&
+      ((needs.pack.result == 'success' && startsWith(github.ref, 'refs/tags/v')) ||
+       (needs.pack.result == 'skipped' && github.ref == 'refs/heads/main' && inputs.retry_tag != ''))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0'
+
+      - name: Download release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETRY_TAG: ${{ inputs.retry_tag }}
+        run: |
+          tag="${RETRY_TAG:-$GITHUB_REF_NAME}"
+          run_id="$GITHUB_RUN_ID"
+          if [[ -n "$RETRY_TAG" ]]; then
+            # Only accept artifacts built by this workflow on the original release tag push.
+            [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected a release tag like v0.6.1'; exit 1; }
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$tag" --jq .sha)
+            run_id=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/nuget.yml/runs" \
+              -f event=push -f branch="$tag" -f head_sha="$sha" -F per_page=1 --jq '.workflow_runs[0].id // empty')
+            [[ -n "$run_id" ]] || { echo "No tag-push run found for $tag at $sha"; exit 1; }
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name nuget-package --dir package
+          test -f "package/Trafilatura.${tag#v}.nupkg"
+          echo "NUPKG=package/Trafilatura.${tag#v}.nupkg" >> "$GITHUB_ENV"
+
+      - name: Log in to NuGet
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        with:
+          user: nchapman
+
+      - name: Push package
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "$NUPKG" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
