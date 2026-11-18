@@ -342,11 +342,7 @@ pub(crate) fn is_code_block_element(doc: &Document, id: NodeId) -> bool {
 
     // Highlight.js: single child that is <code>.
     let children = doc.children(id);
-    if children.len() == 1 && doc.tag_name(children[0]) == "code" {
-        return true;
-    }
-
-    false
+    children.len() == 1 && doc.tag_name(children[0]) == "code"
 }
 
 /// Port of `handleCodeBlocks`.
